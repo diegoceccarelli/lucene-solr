@@ -129,7 +129,6 @@ public class TestRankQueryPlugin extends QParserPlugin {
     }
 
 
-
     public MergeStrategy getMergeStrategy() {
       if(mergeStrategy == 0)
         return new TestMergeStrategy();
