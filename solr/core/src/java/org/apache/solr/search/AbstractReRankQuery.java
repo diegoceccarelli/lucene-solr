@@ -23,6 +23,7 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Rescorer;
+import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.TopDocsCollector;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.util.BytesRef;
@@ -54,6 +55,11 @@ public abstract class AbstractReRankQuery extends RankQuery {
   }
 
   public TopDocsCollector getTopDocsCollector(int len, QueryCommand cmd, IndexSearcher searcher) throws IOException {
+      return getTopDocsCollector(null, len, cmd.getSort(), searcher);
+  }
+
+
+  public TopDocsCollector getTopDocsCollector(TopDocsCollector previousCollector, int length, Sort sort, IndexSearcher searcher) throws IOException {
 
     if(this.boostedPriority == null) {
       SolrRequestInfo info = SolrRequestInfo.getRequestInfo();
@@ -63,7 +69,7 @@ public abstract class AbstractReRankQuery extends RankQuery {
       }
     }
 
-    return new ReRankCollector(reRankDocs, len, reRankQueryRescorer, cmd, searcher, boostedPriority);
+    return new ReRankCollector(previousCollector, reRankDocs, length, sort, reRankQueryRescorer, searcher, boostedPriority);
   }
 
   public Query rewrite(IndexReader reader) throws IOException {

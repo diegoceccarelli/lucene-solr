@@ -16,18 +16,26 @@
  */
 package org.apache.solr.search;
 
-import org.apache.lucene.util.FixedBitSet;
-import org.apache.solr.handler.component.MergeStrategy;
-import org.apache.solr.request.SolrRequestInfo;
-
-import org.apache.lucene.search.*;
-import org.apache.lucene.index.*;
-import org.apache.solr.request.SolrQueryRequest;
-import org.apache.solr.common.params.SolrParams;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.LeafCollector;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.TopDocsCollector;
+import org.apache.lucene.search.Weight;
+import org.apache.lucene.util.FixedBitSet;
+import org.apache.solr.common.params.SolrParams;
+import org.apache.solr.handler.component.MergeStrategy;
+import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.request.SolrRequestInfo;
 
 public class ExportQParserPlugin extends QParserPlugin {
 
@@ -84,8 +92,15 @@ public class ExportQParserPlugin extends QParserPlugin {
       }
     }
 
-    public TopDocsCollector getTopDocsCollector(int len,
-                                                QueryCommand cmd,
+    @Override
+    public TopDocsCollector getTopDocsCollector(int len, QueryCommand cmd, IndexSearcher searcher) throws IOException {
+      return getTopDocsCollector(null, len, cmd.getSort(), searcher);
+    }
+
+    @Override
+    public TopDocsCollector getTopDocsCollector(TopDocsCollector previousCollector,
+                                                int len,
+                                                Sort sort,
                                                 IndexSearcher searcher) throws IOException {
       int leafCount = searcher.getTopReaderContext().leaves().size();
       FixedBitSet[] sets = new FixedBitSet[leafCount];

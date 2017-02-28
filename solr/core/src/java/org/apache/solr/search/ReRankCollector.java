@@ -20,9 +20,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Map;
+
 import com.carrotsearch.hppc.IntFloatHashMap;
 import com.carrotsearch.hppc.IntIntHashMap;
-
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.LeafCollector;
@@ -48,20 +48,33 @@ public class ReRankCollector extends TopDocsCollector {
   final private Map<BytesRef, Integer> boostedPriority;
   final private Rescorer reRankQueryRescorer;
 
-
+  @Deprecated
   public ReRankCollector(int reRankDocs,
       int length,
       Rescorer reRankQueryRescorer,
       QueryCommand cmd,
       IndexSearcher searcher,
       Map<BytesRef, Integer> boostedPriority) throws IOException {
+    this(null, reRankDocs, length, cmd.getSort(), reRankQueryRescorer, searcher, boostedPriority);
+  }
+
+  public ReRankCollector(TopDocsCollector previousCollector,
+                         int reRankDocs,
+                         int length,
+                         Sort sort,
+                         Rescorer reRankQueryRescorer,
+                         IndexSearcher searcher,
+                         Map<BytesRef, Integer> boostedPriority) throws IOException {
     super(null);
-    this.reRankDocs = reRankDocs;
     this.length = length;
+    this.reRankDocs = reRankDocs;
+
     this.boostedPriority = boostedPriority;
-    Sort sort = cmd.getSort();
-    if(sort == null) {
-      this.mainCollector = TopScoreDocCollector.create(Math.max(this.reRankDocs, length));
+    if (previousCollector != null) {
+      this.mainCollector = previousCollector;
+    }
+    else if(sort == null) {
+      this.mainCollector = TopScoreDocCollector.create( Math.max(this.reRankDocs, length));
     } else {
       sort = sort.rewrite(searcher);
       this.mainCollector = TopFieldCollector.create(sort, Math.max(this.reRankDocs, length), false, true, true);
@@ -69,6 +82,7 @@ public class ReRankCollector extends TopDocsCollector {
     this.searcher = searcher;
     this.reRankQueryRescorer = reRankQueryRescorer;
   }
+
 
   public int getTotalHits() {
     return mainCollector.getTotalHits();
