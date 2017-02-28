@@ -84,8 +84,10 @@ public class ExportQParserPlugin extends QParserPlugin {
       }
     }
 
-    @Override
-    public TopDocsCollector getTopDocsCollector(int len, QueryCommand cmd, IndexSearcher searcher) throws IOException {
+    public TopDocsCollector getTopDocsCollector(int len,
+                                                QueryCommand cmd,
+                                                IndexSearcher searcher) throws IOException {
+
       return getTopDocsCollector(null, len, cmd.getSort(), searcher);
     }
 
