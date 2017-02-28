@@ -51,15 +51,4 @@ public class RerankTermSecondPassGroupingCollector extends TermSecondPassGroupin
       }
     }
   }
-
-  
-   
-    
-   
-  
-
-
-  
-  
-
 }
