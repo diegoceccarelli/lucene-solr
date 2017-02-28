@@ -16,15 +16,18 @@
  */
 package org.apache.solr.search;
 
-import java.io.*;
-import java.util.*;
+import org.apache.lucene.util.FixedBitSet;
+import org.apache.solr.handler.component.MergeStrategy;
+import org.apache.solr.request.SolrRequestInfo;
 
-import org.apache.lucene.index.*;
 import org.apache.lucene.search.*;
-import org.apache.lucene.util.*;
-import org.apache.solr.common.params.*;
-import org.apache.solr.handler.component.*;
-import org.apache.solr.request.*;
+import org.apache.lucene.index.*;
+import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.common.params.SolrParams;
+
+import java.io.IOException;
+import java.util.Map;
+import java.util.Objects;
 
 public class ExportQParserPlugin extends QParserPlugin {
 
