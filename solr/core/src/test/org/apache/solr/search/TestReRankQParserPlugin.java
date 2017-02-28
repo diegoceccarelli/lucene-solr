@@ -658,7 +658,6 @@ public class TestReRankQParserPlugin extends SolrTestCaseJ4 {
   }
 
   @Test
-  //@BadApple(bugUrl = "https://issues.apache.org/jira/browse/SOLR-8776")
   public void testRerankQueryAndGroupingRerankGroups() throws Exception {
     assertU(delQ("*:*"));
     assertU(commit());
