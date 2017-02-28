@@ -16,26 +16,15 @@
  */
 package org.apache.solr.search;
 
-import java.io.IOException;
-import java.util.Map;
-import java.util.Objects;
+import java.io.*;
+import java.util.*;
 
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.LeafCollector;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.Scorer;
-import org.apache.lucene.search.Sort;
-import org.apache.lucene.search.TopDocs;
-import org.apache.lucene.search.TopDocsCollector;
-import org.apache.lucene.search.Weight;
-import org.apache.lucene.util.FixedBitSet;
-import org.apache.solr.common.params.SolrParams;
-import org.apache.solr.handler.component.MergeStrategy;
-import org.apache.solr.request.SolrQueryRequest;
-import org.apache.solr.request.SolrRequestInfo;
+import org.apache.lucene.index.*;
+import org.apache.lucene.search.*;
+import org.apache.lucene.util.*;
+import org.apache.solr.common.params.*;
+import org.apache.solr.handler.component.*;
+import org.apache.solr.request.*;
 
 public class ExportQParserPlugin extends QParserPlugin {
 
