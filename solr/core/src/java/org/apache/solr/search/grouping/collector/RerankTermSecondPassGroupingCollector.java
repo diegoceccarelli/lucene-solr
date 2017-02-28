@@ -33,20 +33,20 @@ import org.slf4j.LoggerFactory;
 public class RerankTermSecondPassGroupingCollector extends TermSecondPassGroupingCollector {
 
   private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
+  private static final int DEFAULT_GROUPING_RERANKING = 10;
 
 
   public RerankTermSecondPassGroupingCollector(String groupField, Collection<SearchGroup<BytesRef>> groups,
       Sort groupSort, Sort withinGroupSort, IndexSearcher searcher, RankQuery query, int maxDocsPerGroup, boolean getScores, boolean getMaxScores,
       boolean fillSortFields) throws IOException {
     super(groupField, groups, groupSort, withinGroupSort, maxDocsPerGroup, getScores, getMaxScores, fillSortFields);
-    logger.info("Rerank grouping");
 
 
     for (SearchGroup<BytesRef> group : groups) {
       TopDocsCollector<?> collector;
       if (query != null) {
         collector = groupMap.get(group.groupValue).collector;
-        collector = query.getTopDocsCollector(collector, 10, groupSort, searcher);
+        collector = query.getTopDocsCollector(collector, DEFAULT_GROUPING_RERANKING, groupSort, searcher);
         groupMap.put(group.groupValue, new SearchGroupDocs<BytesRef>(group.groupValue, collector));
       }
     }
