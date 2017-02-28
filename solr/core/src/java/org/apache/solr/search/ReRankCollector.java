@@ -20,7 +20,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Map;
-
 import com.carrotsearch.hppc.IntFloatHashMap;
 import com.carrotsearch.hppc.IntIntHashMap;
 import org.apache.lucene.index.LeafReaderContext;
@@ -51,23 +50,23 @@ public class ReRankCollector extends TopDocsCollector {
 
   @Deprecated
   public ReRankCollector(int reRankDocs,
-      int len,
+      int length,
       Rescorer reRankQueryRescorer,
       QueryCommand cmd,
       IndexSearcher searcher,
       Map<BytesRef, Integer> boostedPriority) throws IOException {
-    this(null, reRankDocs, len, cmd.getSort(), reRankQueryRescorer, searcher, boostedPriority);
+    this(null, reRankDocs, length, cmd.getSort(), reRankQueryRescorer, searcher, boostedPriority);
   }
 
   public ReRankCollector(TopDocsCollector previousCollector,
                          int reRankDocs,
-                         int len,
+                         int length,
                          Sort sort,
                          Rescorer reRankQueryRescorer,
                          IndexSearcher searcher,
                          Map<BytesRef, Integer> boostedPriority) throws IOException {
     super(null);
-    this.length = len;
+    this.length = length;
     this.reRankDocs = reRankDocs;
     this.boostedPriority = boostedPriority;
     this.previousCollector = previousCollector;
@@ -80,7 +79,6 @@ public class ReRankCollector extends TopDocsCollector {
     this.searcher = searcher;
     this.reRankQueryRescorer = reRankQueryRescorer;
   }
-
 
   public int getTotalHits() {
     return mainCollector.getTotalHits();
