@@ -33,6 +33,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.JavaBinCodec;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.response.transform.DocTransformer;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.DocList;
@@ -119,11 +120,15 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
 
     protected void writeResultsBody( ResultContext res, JavaBinCodec codec ) throws IOException {
       codec.writeTag(JavaBinCodec.ARR, res.getDocList().size());
+      DocTransformer transformer = res.getReturnFields().getTransformer();
+      if (transformer != null) transformer.prepare(res);
+
       Iterator<SolrDocument> docStreamer = res.getProcessedDocuments();
       while (docStreamer.hasNext()) {
         SolrDocument doc = docStreamer.next();
         codec.writeSolrDocument(doc);
       }
+      if (transformer != null) transformer.finish();
     }
 
     public void writeResults(ResultContext ctx, JavaBinCodec codec) throws IOException {

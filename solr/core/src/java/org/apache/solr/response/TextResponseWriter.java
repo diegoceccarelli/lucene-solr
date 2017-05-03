@@ -41,6 +41,7 @@ import org.apache.solr.common.params.CommonParams;
 import org.apache.solr.common.util.Base64;
 import org.apache.solr.common.util.NamedList;
 import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.response.transform.DocTransformer;
 import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.DocList;
@@ -257,15 +258,20 @@ public abstract class TextResponseWriter implements PushWriter {
 
   public final void writeDocuments(String name, ResultContext res) throws IOException {
     DocList ids = res.getDocList();
+    DocTransformer transformer = res.getReturnFields().getTransformer();
+    if (transformer != null) transformer.prepare(res);
     Iterator<SolrDocument> docsStreamer = res.getProcessedDocuments();
     writeStartDocumentList(name, ids.offset(), ids.size(), ids.matches(),
         res.wantsScores() ? new Float(ids.maxScore()) : null);
 
     int idx = 0;
+
+
     while (docsStreamer.hasNext()) {
       writeSolrDocument(null, docsStreamer.next(), res.getReturnFields(), idx);
       idx++;
     }
+    if (transformer != null) transformer.finish();
     writeEndDocumentList();
   }
   

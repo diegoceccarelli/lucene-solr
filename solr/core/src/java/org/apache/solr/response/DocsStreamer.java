@@ -85,8 +85,6 @@ public class DocsStreamer implements Iterator<SolrDocument> {
     // add non-stored DV fields that may have been requested
     docFetcher = rctx.getSearcher().getDocFetcher();
     dvFieldsToReturn = calcDocValueFieldsForReturn(docFetcher, rctx.getReturnFields());
-
-    if (transformer != null) transformer.setContext(rctx);
   }
 
   // TODO move to ReturnFields ?  Or SolrDocumentFetcher ?

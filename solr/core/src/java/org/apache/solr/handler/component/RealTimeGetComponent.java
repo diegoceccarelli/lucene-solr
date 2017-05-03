@@ -296,13 +296,13 @@ public class RealTimeGetComponent extends SearchComponent
          if (null == resultContext) {
            // either first pass, or we've re-opened searcher - either way now we setContext
            resultContext = new RTGResultContext(rsp.getReturnFields(), searcherInfo.getSearcher(), req);
-           transformer.setContext(resultContext);
+           transformer.prepare(resultContext);
          }
          transformer.transform(doc, docid, 0);
        }
        docList.add(doc);
      }
-
+     if ( null != transformer) transformer.finish();
    } finally {
      searcherInfo.clear();
    }

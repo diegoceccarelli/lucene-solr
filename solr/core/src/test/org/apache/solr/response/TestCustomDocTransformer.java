@@ -68,6 +68,31 @@ public class TestCustomDocTransformer extends SolrTestCaseJ4 {
         "//str[.='xx#title_2#']",
         "//str[.='xx#title_3#']");
   }
+
+  @Test
+  public void testCustomTransformer2() throws Exception {
+    // Build a simple index
+    int max = 10;
+    for(int i=0; i<max; i++) {
+      SolrInputDocument sdoc = new SolrInputDocument();
+      sdoc.addField("id", i);
+      sdoc.addField("subject", "xx");
+      sdoc.addField("title", "title_"+i);
+      updateJ(jsonAdd(sdoc), null);
+    }
+    assertU(commit());
+    assertQ(req("q", "*:*"), "//*[@numFound='" + max + "']");
+
+    assertQ( req(
+        "q", "*:*",
+        "fl", "id,out:[custom2 extra=subject,title]"),
+        // Check that the concatenated fields make it in the results
+        "//*[@numFound='" + max + "']",
+        "//str[.='xx#title_0#']",
+        "//str[.='xx#title_1#']",
+        "//str[.='xx#title_2#']",
+        "//str[.='xx#title_3#']");
+  }
   
   public static class CustomTransformerFactory extends TransformerFactory {
     @Override
@@ -124,5 +149,38 @@ public class TestCustomDocTransformer extends SolrTestCaseJ4 {
       return v.toString();
     }
     return null;
+  }
+
+  public static class CustomTransformer2 extends DocTransformer {
+    final String name;
+    final String[] extra;
+    int counter;
+
+    public CustomTransformer2(String name, String[] extra) {
+      this.name = name;
+      this.extra = extra;
+    }
+
+    @Override
+    public String getName() {
+      return "custom2";
+    }
+
+    @Override
+    public String[] getExtraRequestFields() {
+      return extra;
+    }
+
+    /**
+     * This transformer simply concatenates the values of multiple fields
+     */
+    @Override
+    public void transform(SolrDocument doc, int docid, float score) throws IOException {
+      counter++;
+    }
+
+    public void finish(){
+      System.out.println(counter);
+    }
   }
 }
