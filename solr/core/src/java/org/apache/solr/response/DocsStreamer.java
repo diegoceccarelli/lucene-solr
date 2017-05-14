@@ -85,6 +85,8 @@ public class DocsStreamer implements Iterator<SolrDocument> {
     // add non-stored DV fields that may have been requested
     docFetcher = rctx.getSearcher().getDocFetcher();
     dvFieldsToReturn = calcDocValueFieldsForReturn(docFetcher, rctx.getReturnFields());
+
+    if (transformer != null) transformer.setContext(rctx);
   }
 
   // TODO move to ReturnFields ?  Or SolrDocumentFetcher ?
@@ -138,6 +140,11 @@ public class DocsStreamer implements Iterator<SolrDocument> {
 
   public boolean hasNext() {
     return docIterator.hasNext();
+  }
+
+  // called at the end of the stream
+  public void finish(){
+    if (transformer != null) transformer.finish();
   }
 
   public SolrDocument next() {

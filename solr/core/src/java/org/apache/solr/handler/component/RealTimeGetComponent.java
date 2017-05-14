@@ -61,6 +61,7 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.core.SolrCore;
 import org.apache.solr.request.SolrQueryRequest;
+import org.apache.solr.response.DocsStreamer;
 import org.apache.solr.response.ResultContext;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.response.transform.DocTransformer;
@@ -1210,7 +1211,7 @@ public class RealTimeGetComponent extends SearchComponent
     }
     
     /** @returns null */
-    public Iterator<SolrDocument> getProcessedDocuments() {
+    public DocsStreamer getProcessedDocuments() {
       return null;
     }
   }

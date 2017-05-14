@@ -120,15 +120,15 @@ public class BinaryResponseWriter implements BinaryQueryResponseWriter {
 
     protected void writeResultsBody( ResultContext res, JavaBinCodec codec ) throws IOException {
       codec.writeTag(JavaBinCodec.ARR, res.getDocList().size());
-      DocTransformer transformer = res.getReturnFields().getTransformer();
-      if (transformer != null) transformer.prepare(res);
 
-      Iterator<SolrDocument> docStreamer = res.getProcessedDocuments();
-      while (docStreamer.hasNext()) {
-        SolrDocument doc = docStreamer.next();
+      Iterator<SolrDocument> docsStreamer = res.getProcessedDocuments();
+      while (docsStreamer.hasNext()) {
+        SolrDocument doc = docsStreamer.next();
         codec.writeSolrDocument(doc);
       }
-      if (transformer != null) transformer.finish();
+      if (docsStreamer instanceof DocsStreamer){
+        ((DocsStreamer)docsStreamer).finish();
+      }
     }
 
     public void writeResults(ResultContext ctx, JavaBinCodec codec) throws IOException {
