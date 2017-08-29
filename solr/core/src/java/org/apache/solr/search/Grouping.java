@@ -774,7 +774,7 @@ public class Grouping {
       }
       else {
         secondPass = new TopGroupsCollector<>(new TermGroupSelector(groupBy),
-            topGGroups, groupSort, withinGroupSort, groupedDocsToCollect, needScores, needScores, false
+            topGroups, groupSort, withinGroupSort, groupedDocsToCollect, needScores, needScores, false
         );
       }
 
