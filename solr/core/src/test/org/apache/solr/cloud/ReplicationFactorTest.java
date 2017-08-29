@@ -64,10 +64,10 @@ public class ReplicationFactorTest extends AbstractFullDistribZkTestBase {
    */
   @Override
   public JettySolrRunner createJetty(File solrHome, String dataDir,
-      String shardList, String solrConfigOverride, String schemaOverride)
+      String shardList, String solrConfigOverride, String schemaOverride, Replica.Type replicaType)
       throws Exception {
 
-    return createProxiedJetty(solrHome, dataDir, shardList, solrConfigOverride, schemaOverride);
+    return createProxiedJetty(solrHome, dataDir, shardList, solrConfigOverride, schemaOverride, replicaType);
   }
   
   @Test
@@ -98,14 +98,12 @@ public class ReplicationFactorTest extends AbstractFullDistribZkTestBase {
     String shardId = "shard1";
     int minRf = 2;
     
-    CollectionAdminResponse resp = createCollection(testCollectionName, numShards, replicationFactor, maxShardsPerNode);
+    CollectionAdminResponse resp = createCollection(testCollectionName, "conf1", numShards, replicationFactor, maxShardsPerNode);
     
     if (resp.getResponse().get("failure") != null) {
-      CollectionAdminRequest.Delete req = new CollectionAdminRequest.Delete();
-      req.setCollectionName(testCollectionName);
-      req.process(cloudClient);
+      CollectionAdminRequest.deleteCollection(testCollectionName).process(cloudClient);
       
-      resp = createCollection(testCollectionName, numShards, replicationFactor, maxShardsPerNode);
+      resp = createCollection(testCollectionName, "conf1", numShards, replicationFactor, maxShardsPerNode);
       
       if (resp.getResponse().get("failure") != null) {
         fail("Could not create " + testCollectionName);
@@ -186,7 +184,7 @@ public class ReplicationFactorTest extends AbstractFullDistribZkTestBase {
     String shardId = "shard1";
     int minRf = 2;
     
-    createCollection(testCollectionName, numShards, replicationFactor, maxShardsPerNode);
+    createCollection(testCollectionName, "conf1", numShards, replicationFactor, maxShardsPerNode);
     cloudClient.setDefaultCollection(testCollectionName);
     
     List<Replica> replicas = 

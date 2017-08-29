@@ -73,6 +73,8 @@ import org.apache.solr.request.SolrRequestInfo;
 import org.apache.solr.security.AuthenticationPlugin;
 import org.apache.solr.security.PKIAuthenticationPlugin;
 import org.apache.solr.util.SolrFileCleaningTracker;
+import org.apache.solr.util.StartupLoggingUtils;
+import org.apache.solr.util.configuration.SSLConfigurationsFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -132,6 +134,10 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
   public static final String SOLRHOME_ATTRIBUTE = "solr.solr.home";
 
+  public static final String SOLR_INSTALL_DIR_ATTRIBUTE = "solr.install.dir";
+
+  public static final String SOLR_DEFAULT_CONFDIR_ATTRIBUTE = "solr.default.confdir";
+
   public static final String SOLR_LOG_MUTECONSOLE = "solr.log.muteconsole";
 
   public static final String SOLR_LOG_LEVEL = "solr.log.level";
@@ -139,6 +145,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   @Override
   public void init(FilterConfig config) throws ServletException
   {
+    SSLConfigurationsFactory.current().init();
     log.trace("SolrDispatchFilter.init(): {}", this.getClass().getClassLoader());
     CoreContainer coresInit = null;
     try{
@@ -153,6 +160,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
     }
     String logLevel = System.getProperty(SOLR_LOG_LEVEL);
     if (logLevel != null) {
+      log.info("Log level override, property solr.log.level=" + logLevel);
       StartupLoggingUtils.changeLogLevel(logLevel);
     }
 
@@ -221,7 +229,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
   private void logWelcomeBanner() {
     log.info(" ___      _       Welcome to Apache Solr™ version {}", solrVersion());
     log.info("/ __| ___| |_ _   Starting in {} mode on port {}", isCloudMode() ? "cloud" : "standalone", getSolrPort());
-    log.info("\\__ \\/ _ \\ | '_|  Install dir: {}", System.getProperty("solr.install.dir"));
+    log.info("\\__ \\/ _ \\ | '_|  Install dir: {}, Default config dir: {}", System.getProperty(SOLR_INSTALL_DIR_ATTRIBUTE), System.getProperty(SOLR_DEFAULT_CONFDIR_ATTRIBUTE));
     log.info("|___/\\___/_|_|    Start time: {}", Instant.now().toString());
   }
 
@@ -263,7 +271,7 @@ public class SolrDispatchFilter extends BaseSolrFilter {
    */
   public static NodeConfig loadNodeConfig(Path solrHome, Properties nodeProperties) {
 
-    SolrResourceLoader loader = new SolrResourceLoader(solrHome, null, nodeProperties);
+    SolrResourceLoader loader = new SolrResourceLoader(solrHome, SolrDispatchFilter.class.getClassLoader(), nodeProperties);
     if (!StringUtils.isEmpty(System.getProperty("solr.solrxml.location"))) {
       log.warn("Solr property solr.solrxml.location is no longer supported. " +
                "Will automatically load solr.xml from ZooKeeper if it exists");
@@ -271,7 +279,9 @@ public class SolrDispatchFilter extends BaseSolrFilter {
 
     String zkHost = System.getProperty("zkHost");
     if (!StringUtils.isEmpty(zkHost)) {
-      try (SolrZkClient zkClient = new SolrZkClient(zkHost, 30000)) {
+      int startUpZkTimeOut = Integer.getInteger("waitForZk", 30);
+      startUpZkTimeOut *= 1000;
+      try (SolrZkClient zkClient = new SolrZkClient(zkHost, startUpZkTimeOut)) {
         if (zkClient.exists("/solr.xml", true)) {
           log.info("solr.xml found in ZooKeeper. Loading...");
           byte[] data = zkClient.getData("/solr.xml", null, null, true);

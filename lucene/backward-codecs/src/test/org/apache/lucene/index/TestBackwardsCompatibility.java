@@ -60,10 +60,6 @@ import org.apache.lucene.document.SortedSetDocValuesField;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
-import org.apache.lucene.legacy.LegacyIntField;
-import org.apache.lucene.legacy.LegacyLongField;
-import org.apache.lucene.legacy.LegacyNumericRangeQuery;
-import org.apache.lucene.legacy.LegacyNumericUtils;
 import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.ScoreDoc;
@@ -280,28 +276,6 @@ public class TestBackwardsCompatibility extends LuceneTestCase {
   }
 
   final static String[] oldNames = {
-    "6.0.0-cfs",
-    "6.0.0-nocfs",
-    "6.0.1-cfs",
-    "6.0.1-nocfs",
-    "6.1.0-cfs",
-    "6.1.0-nocfs",
-    "6.2.0-cfs",
-    "6.2.0-nocfs",
-    "6.2.1-cfs",
-    "6.2.1-nocfs",
-    "6.3.0-cfs",
-    "6.3.0-nocfs",
-    "6.4.0-cfs",
-    "6.4.0-nocfs",
-    "6.4.1-cfs",
-    "6.4.1-nocfs",
-    "6.4.2-cfs",
-    "6.4.2-nocfs",
-    "6.5.0-cfs",
-    "6.5.0-nocfs",
-    "6.5.1-cfs",
-    "6.5.1-nocfs"
   };
   
   final String[] unsupportedNames = {
@@ -434,7 +408,31 @@ public class TestBackwardsCompatibility extends LuceneTestCase {
       "5.5.3-cfs",
       "5.5.3-nocfs",
       "5.5.4-cfs",
-      "5.5.4-nocfs"
+      "5.5.4-nocfs",
+      "6.0.0-cfs",
+      "6.0.0-nocfs",
+      "6.0.1-cfs",
+      "6.0.1-nocfs",
+      "6.1.0-cfs",
+      "6.1.0-nocfs",
+      "6.2.0-cfs",
+      "6.2.0-nocfs",
+      "6.2.1-cfs",
+      "6.2.1-nocfs",
+      "6.3.0-cfs",
+      "6.3.0-nocfs",
+      "6.4.0-cfs",
+      "6.4.0-nocfs",
+      "6.4.1-cfs",
+      "6.4.1-nocfs",
+      "6.4.2-cfs",
+      "6.4.2-nocfs",
+      "6.5.0-cfs",
+      "6.5.0-nocfs",
+      "6.5.1-cfs",
+      "6.5.1-nocfs",
+      "6.6.0-cfs",
+      "6.6.0-nocfs"
   };
 
   // TODO: on 6.0.0 release, gen the single segment indices and add here:
@@ -1114,9 +1112,6 @@ public class TestBackwardsCompatibility extends LuceneTestCase {
     doc.add(new Field("utf8", "Lu\uD834\uDD1Ece\uD834\uDD60ne \u0000 \u2620 ab\ud917\udc17cd", customType2));
     doc.add(new Field("content2", "here is more content with aaa aaa aaa", customType2));
     doc.add(new Field("fie\u2C77ld", "field with non-ascii name", customType2));
-    // add numeric fields, to test if flex preserves encoding
-    doc.add(new LegacyIntField("trieInt", id, Field.Store.NO));
-    doc.add(new LegacyLongField("trieLong", (long) id, Field.Store.NO));
 
     // add docvalues fields
     doc.add(new NumericDocValuesField("dvByte", (byte) id));
@@ -1197,7 +1192,7 @@ public class TestBackwardsCompatibility extends LuceneTestCase {
     for (String name : oldNames) {
       Directory dir = oldIndexDirs.get(name);
       IndexReader r = DirectoryReader.open(dir);
-      TermsEnum terms = MultiFields.getFields(r).terms("content").iterator();
+      TermsEnum terms = MultiFields.getTerms(r, "content").iterator();
       BytesRef t = terms.next();
       assertNotNull(t);
 
@@ -1291,51 +1286,6 @@ public class TestBackwardsCompatibility extends LuceneTestCase {
     for (String name : oldNames) {
       Directory dir = oldIndexDirs.get(name);
       verifyUsesDefaultCodec(dir, name);
-    }
-  }
-  
-  public void testNumericFields() throws Exception {
-    for (String name : oldNames) {
-      
-      Directory dir = oldIndexDirs.get(name);
-      IndexReader reader = DirectoryReader.open(dir);
-      IndexSearcher searcher = newSearcher(reader);
-      
-      for (int id=10; id<15; id++) {
-        ScoreDoc[] hits = searcher.search(LegacyNumericRangeQuery.newIntRange("trieInt", LegacyNumericUtils.PRECISION_STEP_DEFAULT_32, Integer.valueOf(id), Integer.valueOf(id), true, true), 100).scoreDocs;
-        assertEquals("wrong number of hits", 1, hits.length);
-        Document d = searcher.doc(hits[0].doc);
-        assertEquals(String.valueOf(id), d.get("id"));
-        
-        hits = searcher.search(LegacyNumericRangeQuery.newLongRange("trieLong", LegacyNumericUtils.PRECISION_STEP_DEFAULT, Long.valueOf(id), Long.valueOf(id), true, true), 100).scoreDocs;
-        assertEquals("wrong number of hits", 1, hits.length);
-        d = searcher.doc(hits[0].doc);
-        assertEquals(String.valueOf(id), d.get("id"));
-      }
-      
-      // check that also lower-precision fields are ok
-      ScoreDoc[] hits = searcher.search(LegacyNumericRangeQuery.newIntRange("trieInt", LegacyNumericUtils.PRECISION_STEP_DEFAULT_32, Integer.MIN_VALUE, Integer.MAX_VALUE, false, false), 100).scoreDocs;
-      assertEquals("wrong number of hits", 34, hits.length);
-      
-      hits = searcher.search(LegacyNumericRangeQuery.newLongRange("trieLong", LegacyNumericUtils.PRECISION_STEP_DEFAULT, Long.MIN_VALUE, Long.MAX_VALUE, false, false), 100).scoreDocs;
-      assertEquals("wrong number of hits", 34, hits.length);
-      
-      // check decoding of terms
-      Terms terms = MultiFields.getTerms(searcher.getIndexReader(), "trieInt");
-      TermsEnum termsEnum = LegacyNumericUtils.filterPrefixCodedInts(terms.iterator());
-      while (termsEnum.next() != null) {
-        int val = LegacyNumericUtils.prefixCodedToInt(termsEnum.term());
-        assertTrue("value in id bounds", val >= 0 && val < 35);
-      }
-      
-      terms = MultiFields.getTerms(searcher.getIndexReader(), "trieLong");
-      termsEnum = LegacyNumericUtils.filterPrefixCodedLongs(terms.iterator());
-      while (termsEnum.next() != null) {
-        long val = LegacyNumericUtils.prefixCodedToLong(termsEnum.term());
-        assertTrue("value in id bounds", val >= 0L && val < 35L);
-      }
-      
-      reader.close();
     }
   }
   
@@ -1486,9 +1436,10 @@ public class TestBackwardsCompatibility extends LuceneTestCase {
     }
   }
 
-  public static final String emptyIndex = "empty.6.0.0.zip";
+  public static final String emptyIndex = "empty.7.0.0.zip";
 
   public void testUpgradeEmptyOldIndex() throws Exception {
+    assumeTrue("Reenable when 7.0 is released", false);
     Path oldIndexDir = createTempDir("emptyIndex");
     TestUtil.unzip(getDataInputStream(emptyIndex), oldIndexDir);
     Directory dir = newFSDirectory(oldIndexDir);
@@ -1500,9 +1451,10 @@ public class TestBackwardsCompatibility extends LuceneTestCase {
     dir.close();
   }
 
-  public static final String moreTermsIndex = "moreterms.6.0.0.zip";
+  public static final String moreTermsIndex = "moreterms.7.0.0.zip";
 
   public void testMoreTerms() throws Exception {
+    assumeTrue("Reenable when 7.0 is released", false);
     Path oldIndexDir = createTempDir("moreterms");
     TestUtil.unzip(getDataInputStream(moreTermsIndex), oldIndexDir);
     Directory dir = newFSDirectory(oldIndexDir);
@@ -1512,7 +1464,7 @@ public class TestBackwardsCompatibility extends LuceneTestCase {
     dir.close();
   }
 
-  public static final String dvUpdatesIndex = "dvupdates.6.0.0.zip";
+  public static final String dvUpdatesIndex = "dvupdates.7.0.0.zip";
 
   private void assertNumericDocValues(LeafReader r, String f, String cf) throws IOException {
     NumericDocValues ndvf = r.getNumericDocValues(f);
@@ -1545,8 +1497,9 @@ public class TestBackwardsCompatibility extends LuceneTestCase {
     }
     reader.close();
   }
-  
+
   public void testDocValuesUpdates() throws Exception {
+    assumeTrue("Reenable when 7.0 is released", false);
     Path oldIndexDir = createTempDir("dvupdates");
     TestUtil.unzip(getDataInputStream(dvUpdatesIndex), oldIndexDir);
     Directory dir = newFSDirectory(oldIndexDir);
@@ -1609,7 +1562,8 @@ public class TestBackwardsCompatibility extends LuceneTestCase {
   }
 
   public void testSortedIndex() throws Exception {
-    String[] versions = new String[] {"6.2.0", "6.2.1", "6.3.0"};
+    assumeTrue("Reenable when 7.0 is released", false);
+    String[] versions = new String[] {};
     for(String version : versions) {
       Path path = createTempDir("sorted");
       InputStream resource = TestBackwardsCompatibility.class.getResourceAsStream("sorted." + version + ".zip");

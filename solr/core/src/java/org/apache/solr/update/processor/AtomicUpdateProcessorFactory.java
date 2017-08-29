@@ -61,8 +61,9 @@ public class AtomicUpdateProcessorFactory extends UpdateRequestProcessorFactory 
   private final static Set<String> VALID_OPS = new HashSet<>(Arrays.asList(ADD, INC, REMOVE, SET, REMOVEREGEX));
 
   private final static String VERSION = "_version_";
-  private final static String ATOMIC_FIELD_PREFIX = "Atomic.";
-  private final static int MAX_ATTEMPTS = 5;
+  public static final String NAME = "atomic";
+  public final static String ATOMIC_FIELD_PREFIX = "atomic.";
+  private final static int MAX_ATTEMPTS = 25;
 
   private VersionInfo vinfo;
 
@@ -164,7 +165,7 @@ public class AtomicUpdateProcessorFactory extends UpdateRequestProcessorFactory 
       try {
         super.processAdd(cmd);
       } catch (SolrException e) {
-        if (attempts++ >= MAX_ATTEMPTS) {//maximum number of attempts allowed: 5
+        if (attempts++ >= MAX_ATTEMPTS) {//maximum number of attempts allowed: 25
           throw new SolrException(SERVER_ERROR,
               "Atomic update failed after multiple attempts due to " + e.getMessage());
         }

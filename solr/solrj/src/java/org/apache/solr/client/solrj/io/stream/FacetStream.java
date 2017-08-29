@@ -46,7 +46,6 @@ import org.apache.solr.client.solrj.io.stream.expr.StreamFactory;
 import org.apache.solr.client.solrj.io.stream.metrics.Bucket;
 import org.apache.solr.client.solrj.io.stream.metrics.Metric;
 import org.apache.solr.client.solrj.request.QueryRequest;
-import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.NamedList;
@@ -67,25 +66,10 @@ public class FacetStream extends TupleStream implements Expressible  {
   private List<Tuple> tuples = new ArrayList<Tuple>();
   private int index;
   private String zkHost;
-  private SolrParams params;
+  private ModifiableSolrParams params;
   private String collection;
   protected transient SolrClientCache cache;
   protected transient CloudSolrClient cloudSolrClient;
-
-  /*
-   *
-   * @deprecated. Use the form that takes a SolrParams rather than Map&ltString, String&gt;
-   */
-  @Deprecated
-  public FacetStream(String zkHost,
-                     String collection,
-                     Map<String, String> props,
-                     Bucket[] buckets,
-                     Metric[] metrics,
-                     FieldComparator[] bucketSorts,
-                     int bucketSizeLimit) throws IOException {
-    init(collection, new MapSolrParams(props), buckets, bucketSorts, metrics, bucketSizeLimit, zkHost);
-  }
 
   public FacetStream(String zkHost,
                      String collection,
@@ -232,7 +216,7 @@ public class FacetStream extends TupleStream implements Expressible  {
 
   private void init(String collection, SolrParams params, Bucket[] buckets, FieldComparator[] bucketSorts, Metric[] metrics, int bucketSizeLimit, String zkHost) throws IOException {
     this.zkHost  = zkHost;
-    this.params = params;
+    this.params = new ModifiableSolrParams(params);
     this.buckets = buckets;
     this.metrics = metrics;
     this.bucketSizeLimit   = bucketSizeLimit;
@@ -258,11 +242,11 @@ public class FacetStream extends TupleStream implements Expressible  {
     expression.addParameter(collection);
     
     // parameters
-    ModifiableSolrParams tmpParams = new ModifiableSolrParams(params);
 
-    for (Entry<String, String[]> param : tmpParams.getMap().entrySet()) {
-      expression.addParameter(new StreamExpressionNamedParameter(param.getKey(),
-          String.join(",", param.getValue())));
+    for (Entry<String, String[]> param : params.getMap().entrySet()) {
+      for (String val : param.getValue()) {
+        expression.addParameter(new StreamExpressionNamedParameter(param.getKey(), val));
+      }
     }
     
     // buckets
@@ -493,6 +477,9 @@ public class FacetStream extends TupleStream implements Expressible  {
     for(int b=0; b<allBuckets.size(); b++) {
       NamedList bucket = (NamedList)allBuckets.get(b);
       Object val = bucket.get("val");
+      if (val instanceof Integer) {
+        val=((Integer)val).longValue();  // calcite currently expects Long values here
+      }
       Tuple t = currentTuple.clone();
       t.put(bucketName, val);
       int nextLevel = level+1;

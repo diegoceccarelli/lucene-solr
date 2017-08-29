@@ -612,7 +612,7 @@ public class Grouping {
     }
 
     protected DocList getDocList(GroupDocs groups) {
-      int max = groups.totalHits;
+      int max = Math.toIntExact(groups.totalHits);
       int off = groupOffset;
       int len = docsPerGroup;
       if (format == Format.simple) {
@@ -774,7 +774,7 @@ public class Grouping {
       }
       else {
         secondPass = new TopGroupsCollector<>(new TermGroupSelector(groupBy),
-            topGroups, groupSort, withinGroupSort, groupedDocsToCollect, needScores, needScores, false
+            topGGroups, groupSort, withinGroupSort, groupedDocsToCollect, needScores, needScores, false
         );
       }
 

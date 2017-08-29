@@ -51,7 +51,6 @@ import org.apache.solr.common.cloud.ClusterState;
 import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.ZkStateReader;
-import org.apache.solr.common.params.MapSolrParams;
 import org.apache.solr.common.params.ModifiableSolrParams;
 import org.apache.solr.common.params.SolrParams;
 import org.apache.solr.common.util.ExecutorUtil;
@@ -74,7 +73,7 @@ public class CloudSolrStream extends TupleStream implements Expressible {
 
   protected String zkHost;
   protected String collection;
-  protected SolrParams params;
+  protected ModifiableSolrParams params;
   protected Map<String, String> fieldMappings;
   protected StreamComparator comp;
   private boolean trace;
@@ -89,32 +88,12 @@ public class CloudSolrStream extends TupleStream implements Expressible {
     
   }
 
-
-  /**
-   * @param zkHost         Zookeeper ensemble connection string
-   * @param collectionName Name of the collection to operate on
-   * @param params         Map&lt;String, String&gt; of parameter/value pairs
-   * @throws IOException Something went wrong
-   *                     <p>
-   *                     This form does not allow specifying multiple clauses, say "fq" clauses, use the form that
-   *                     takes a SolrParams. Transition code can call the preferred method that takes SolrParams
-   *                     by calling CloudSolrStream(zkHost, collectionName,
-   *                     new ModifiableSolrParams(SolrParams.toMultiMap(new NamedList(Map&lt;String, String&gt;)));
-   * @deprecated         Use the constructor that has a SolrParams obj rather than a Map
-   */
-
-  @Deprecated
-  public CloudSolrStream(String zkHost, String collectionName, Map params) throws IOException {
-    init(collectionName, zkHost, new MapSolrParams(params));
-  }
-
   /**
    * @param zkHost         Zookeeper ensemble connection string
    * @param collectionName Name of the collection to operate on
    * @param params         Map&lt;String, String[]&gt; of parameter/value pairs
    * @throws IOException Something went wrong
    */
-
   public CloudSolrStream(String zkHost, String collectionName, SolrParams params) throws IOException {
     init(collectionName, zkHost, params);
   }
@@ -193,18 +172,14 @@ public class CloudSolrStream extends TupleStream implements Expressible {
     // collection
     expression.addParameter(collection);
     
-    // parameters
-
-    ModifiableSolrParams mParams = new ModifiableSolrParams(SolrParams.toMultiMap(params.toNamedList()));
-    for (Entry<String, String[]> param : mParams.getMap().entrySet()) {
-      String value = String.join(",", param.getValue());
-      
-      // SOLR-8409: This is a special case where the params contain a " character
-      // Do note that in any other BASE streams with parameters where a " might come into play
-      // that this same replacement needs to take place.
-      value = value.replace("\"", "\\\"");
-
-      expression.addParameter(new StreamExpressionNamedParameter(param.getKey(), value));
+    for (Entry<String, String[]> param : params.getMap().entrySet()) {
+      for (String val : param.getValue()) {
+        // SOLR-8409: Escaping the " is a special case.
+        // Do note that in any other BASE streams with parameters where a " might come into play
+        // that this same replacement needs to take place.
+        expression.addParameter(new StreamExpressionNamedParameter(param.getKey(),
+            val.replace("\"", "\\\"")));
+      }
     }
     
     // zkHost

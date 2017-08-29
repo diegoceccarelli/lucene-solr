@@ -22,7 +22,7 @@ import java.util.Map;
 
 import org.apache.lucene.index.*;
 import org.apache.lucene.index.MultiDocValues.MultiSortedDocValues;
-import org.apache.lucene.index.MultiDocValues.OrdinalMap;
+import org.apache.lucene.index.OrdinalMap;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.Version;
 
@@ -98,9 +98,9 @@ public final class SlowCompositeReaderWrapper extends LeafReader {
   }
 
   @Override
-  public Fields fields() {
+  public Terms terms(String field) throws IOException {
     ensureOpen();
-    return fields;
+    return fields.terms(field);
   }
 
   @Override

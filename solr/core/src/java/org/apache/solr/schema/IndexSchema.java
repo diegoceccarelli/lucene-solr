@@ -68,7 +68,6 @@ import org.apache.solr.core.SolrResourceLoader;
 import org.apache.solr.request.LocalSolrQueryRequest;
 import org.apache.solr.response.SchemaXmlWriter;
 import org.apache.solr.response.SolrQueryResponse;
-import org.apache.solr.search.similarities.ClassicSimilarityFactory;
 import org.apache.solr.search.similarities.SchemaSimilarityFactory;
 import org.apache.solr.util.DOMUtil;
 import org.apache.solr.util.plugin.SolrCoreAware;
@@ -94,9 +93,7 @@ import static java.util.Collections.singletonMap;
 public class IndexSchema {
   public static final String COPY_FIELD = "copyField";
   public static final String COPY_FIELDS = COPY_FIELD + "s";
-  public static final String DEFAULT_OPERATOR = "defaultOperator";
   public static final String DEFAULT_SCHEMA_FILE = "schema.xml";
-  public static final String DEFAULT_SEARCH_FIELD = "defaultSearchField";
   public static final String DESTINATION = "dest";
   public static final String DYNAMIC_FIELD = "dynamicField";
   public static final String DYNAMIC_FIELDS = DYNAMIC_FIELD + "s";
@@ -112,10 +109,10 @@ public class IndexSchema {
   public static final String SCHEMA = "schema";
   public static final String SIMILARITY = "similarity";
   public static final String SLASH = "/";
-  public static final String SOLR_QUERY_PARSER = "solrQueryParser";
   public static final String SOURCE = "source";
   public static final String TYPE = "type";
   public static final String TYPES = "types";
+  public static final String ROOT_FIELD_NAME = "_root_";
   public static final String UNIQUE_KEY = "uniqueKey";
   public static final String VERSION = "version";
 
@@ -146,11 +143,6 @@ public class IndexSchema {
   private Analyzer queryAnalyzer;
 
   protected List<SchemaAware> schemaAware = new ArrayList<>();
-
-  protected String defaultSearchFieldName=null;
-  protected String queryParserDefaultOperator = "OR";
-  protected boolean isExplicitQueryParserDefaultOperator = false;
-
 
   protected Map<String, List<CopyField>> copyFieldsMap = new HashMap<>();
   public Map<String,List<CopyField>> getCopyFieldsMap() { return Collections.unmodifiableMap(copyFieldsMap); }
@@ -303,22 +295,6 @@ public class IndexSchema {
   public Analyzer getQueryAnalyzer() { return queryAnalyzer; }
 
   
-  /**
-   * Name of the default search field specified in the schema file.
-   * <br><b>Note:</b>Avoid calling this, try to use this method so that the 'df' param is consulted as an override:
-   * {@link org.apache.solr.search.QueryParsing#getDefaultField(IndexSchema, String)}
-   */
-  public String getDefaultSearchFieldName() {
-    return defaultSearchFieldName;
-  }
-
-  /**
-   * default operator ("AND" or "OR") for QueryParser
-   */
-  public String getQueryParserDefaultOperator() {
-    return queryParserDefaultOperator;
-  }
-
   protected SchemaField uniqueKeyField;
 
   /**
@@ -397,7 +373,7 @@ public class IndexSchema {
   void persist(Writer writer) throws IOException {
     final SolrQueryResponse response = new SolrQueryResponse();
     response.add(IndexSchema.SCHEMA, getNamedPropertyValues());
-    final NamedList args = new NamedList(Arrays.<Object>asList("indent", "on"));
+    final SolrParams args = (new ModifiableSolrParams()).set("indent", "on");
     final LocalSolrQueryRequest req = new LocalSolrQueryRequest(null, args);
     final SchemaXmlWriter schemaXmlWriter = new SchemaXmlWriter(writer, req, response);
     schemaXmlWriter.setEmitManagedSchemaDoNotEditWarning(true);
@@ -498,8 +474,7 @@ public class IndexSchema {
       Node node = (Node) xpath.evaluate(expression, document, XPathConstants.NODE);
       similarityFactory = readSimilarity(loader, node);
       if (similarityFactory == null) {
-        final boolean modernSim = getDefaultLuceneMatchVersion().onOrAfter(Version.LUCENE_6_0_0);
-        final Class simClass = modernSim ? SchemaSimilarityFactory.class : ClassicSimilarityFactory.class;
+        final Class<?> simClass = SchemaSimilarityFactory.class;
         // use the loader to ensure proper SolrCoreAware handling
         similarityFactory = loader.newInstance(simClass.getName(), SimilarityFactory.class);
         similarityFactory.init(new ModifiableSolrParams());
@@ -521,34 +496,17 @@ public class IndexSchema {
       }
 
       //                      /schema/defaultSearchField/text()
-      expression = stepsToPath(SCHEMA, DEFAULT_SEARCH_FIELD, TEXT_FUNCTION);
+      expression = stepsToPath(SCHEMA, "defaultSearchField", TEXT_FUNCTION);
       node = (Node) xpath.evaluate(expression, document, XPathConstants.NODE);
-      if (node==null) {
-        log.debug("no default search field specified in schema.");
-      } else {
-        defaultSearchFieldName=node.getNodeValue().trim();
-        // throw exception if specified, but not found or not indexed
-        if (defaultSearchFieldName!=null) {
-          SchemaField defaultSearchField = getFields().get(defaultSearchFieldName);
-          if ((defaultSearchField == null) || !defaultSearchField.indexed()) {
-            String msg =  "default search field '" + defaultSearchFieldName + "' not defined or not indexed" ;
-            throw new SolrException(ErrorCode.SERVER_ERROR, msg);
-          }
-        }
-        log.warn("[{}] default search field in schema is {}. WARNING: Deprecated, please use 'df' on request instead.",
-            coreName, defaultSearchFieldName);
+      if (node != null) {
+        throw new SolrException(ErrorCode.SERVER_ERROR, "Setting defaultSearchField in schema not supported since Solr 7");
       }
 
       //                      /schema/solrQueryParser/@defaultOperator
-      expression = stepsToPath(SCHEMA, SOLR_QUERY_PARSER, AT + DEFAULT_OPERATOR);
+      expression = stepsToPath(SCHEMA, "solrQueryParser", AT + "defaultOperator");
       node = (Node) xpath.evaluate(expression, document, XPathConstants.NODE);
-      if (node==null) {
-        log.debug("Default query parser operator not set in Schema");
-      } else {
-        isExplicitQueryParserDefaultOperator = true;
-        queryParserDefaultOperator=node.getNodeValue().trim();
-        log.warn("[{}] query parser default operator is {}. WARNING: Deprecated, please use 'q.op' on request instead.",
-            coreName, queryParserDefaultOperator);
+      if (node != null) {
+        throw new SolrException(ErrorCode.SERVER_ERROR, "Setting default operator in schema (solrQueryParser/@defaultOperator) not supported");
       }
 
       //                      /schema/uniqueKey/text()
@@ -558,6 +516,20 @@ public class IndexSchema {
         log.warn("no " + UNIQUE_KEY + " specified in schema.");
       } else {
         uniqueKeyField=getIndexedField(node.getNodeValue().trim());
+        uniqueKeyFieldName=uniqueKeyField.getName();
+        uniqueKeyFieldType=uniqueKeyField.getType();
+        
+        // we fail on init if the ROOT field is *explicitly* defined as incompatible with uniqueKey
+        // we don't want ot fail if there happens to be a dynamicField matching ROOT, (ie: "*")
+        // because the user may not care about child docs at all.  The run time code
+        // related to child docs can catch that if it happens
+        if (fields.containsKey(ROOT_FIELD_NAME) && ! isUsableForChildDocs()) {
+          String msg = ROOT_FIELD_NAME + " field must be defined using the exact same fieldType as the " +
+            UNIQUE_KEY + " field ("+uniqueKeyFieldName+") uses: " + uniqueKeyFieldType.getTypeName();
+          log.error(msg);
+          throw new SolrException(ErrorCode.SERVER_ERROR, msg);
+        }
+        
         if (null != uniqueKeyField.getDefaultValue()) {
           String msg = UNIQUE_KEY + " field ("+uniqueKeyFieldName+
               ") can not be configured with a default value ("+
@@ -575,9 +547,14 @@ public class IndexSchema {
           log.error(msg);
           throw new SolrException(ErrorCode.SERVER_ERROR, msg);
         }
-        uniqueKeyFieldName=uniqueKeyField.getName();
-        uniqueKeyFieldType=uniqueKeyField.getType();
 
+        if (uniqueKeyField.getType().isPointField()) {
+          String msg = UNIQUE_KEY + " field ("+uniqueKeyFieldName+
+            ") can not be configured to use a Points based FieldType: " + uniqueKeyField.getType().getTypeName();
+          log.error(msg);
+          throw new SolrException(ErrorCode.SERVER_ERROR, msg);
+        }
+        
         // Unless the uniqueKeyField is marked 'required=false' then make sure it exists
         if( Boolean.FALSE != explicitRequiredProp.get( uniqueKeyFieldName ) ) {
           uniqueKeyField.required = true;
@@ -1401,10 +1378,6 @@ public class IndexSchema {
       NAME(IndexSchema.NAME, sp -> sp.schema.getSchemaName()),
       VERSION(IndexSchema.VERSION, sp -> sp.schema.getVersion()),
       UNIQUE_KEY(IndexSchema.UNIQUE_KEY, sp -> sp.schema.uniqueKeyFieldName),
-      DEFAULT_SEARCH_FIELD(IndexSchema.DEFAULT_SEARCH_FIELD, sp -> sp.schema.defaultSearchFieldName),
-      SOLR_QUERY_PARSER(IndexSchema.SOLR_QUERY_PARSER, sp -> sp.schema.isExplicitQueryParserDefaultOperator ?
-          singletonMap(DEFAULT_OPERATOR, sp.schema.queryParserDefaultOperator) :
-          null),
       SIMILARITY(IndexSchema.SIMILARITY, sp -> sp.schema.isExplicitSimilarity ?
           sp.schema.similarityFactory.getNamedPropertyValues() :
           null),
@@ -1950,5 +1923,18 @@ public class IndexSchema {
         + XPATH_OR + stepsToPath(SCHEMA, TYPES, FIELD_TYPE.toLowerCase(Locale.ROOT))
         + XPATH_OR + stepsToPath(SCHEMA, TYPES, FIELD_TYPE);
     return expression;
+  }
+
+  /**
+   * Helper method that returns <code>true</code> if the {@link #ROOT_FIELD_NAME} uses the exact 
+   * same 'type' as the {@link #getUniqueKeyField()}
+   *
+   * @lucene.internal
+   */
+  public boolean isUsableForChildDocs() {
+    FieldType rootType = getFieldType(ROOT_FIELD_NAME);
+    return (null != uniqueKeyFieldType &&
+            null != rootType &&
+            rootType.getTypeName().equals(uniqueKeyFieldType.getTypeName()));
   }
 }

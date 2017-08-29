@@ -20,6 +20,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -30,6 +31,7 @@ import org.apache.solr.cloud.overseer.OverseerAction;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrException.ErrorCode;
 import org.apache.solr.common.cloud.ClusterState;
+import org.apache.solr.common.cloud.DocCollection;
 import org.apache.solr.common.cloud.Replica;
 import org.apache.solr.common.cloud.Slice;
 import org.apache.solr.common.cloud.SolrZkClient;
@@ -326,6 +328,8 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
         return;
       }
       
+      Replica.Type replicaType;
+      
       try (SolrCore core = cc.getCore(coreName)) {
         
         if (core == null) {
@@ -337,6 +341,8 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
             return;
           }
         }
+        
+        replicaType = core.getCoreDescriptor().getCloudDescriptor().getReplicaType();
         
         // should I be leader?
         if (weAreReplacement && !shouldIBeLeader(leaderProps, core, weAreReplacement)) {
@@ -423,9 +429,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
         try {
           // we must check LIR before registering as leader
           checkLIR(coreName, allReplicasInLine);
-
-          boolean onlyLeaderIndexes = zkController.getClusterState().getCollection(collection).getRealtimeReplicas() == 1;
-          if (onlyLeaderIndexes) {
+          if (replicaType == Replica.Type.TLOG) {
             // stop replicate from old leader
             zkController.stopReplicationFromLeader(coreName);
             if (weAreReplacement) {
@@ -495,14 +499,20 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
         ZkStateReader zkStateReader = zkController.getZkStateReader();
         zkStateReader.forceUpdateCollection(collection);
         ClusterState clusterState = zkStateReader.getClusterState();
-        Replica rep = (clusterState == null) ? null
-            : clusterState.getReplica(collection, leaderProps.getStr(ZkStateReader.CORE_NODE_NAME_PROP));
+        Replica rep = getReplica(clusterState, collection, leaderProps.getStr(ZkStateReader.CORE_NODE_NAME_PROP));
         if (rep != null && rep.getState() != Replica.State.ACTIVE
             && rep.getState() != Replica.State.RECOVERING) {
           log.debug("We have become the leader after core registration but are not in an ACTIVE state - publishing ACTIVE");
           zkController.publish(core.getCoreDescriptor(), Replica.State.ACTIVE);
         }
       }
+  }
+  
+  private Replica getReplica(ClusterState clusterState, String collectionName, String replicaName) {
+    if (clusterState == null) return null;
+    final DocCollection docCollection = clusterState.getCollectionOrNull(collectionName);
+    if (docCollection == null) return null;
+    return docCollection.getReplica(replicaName);
   }
 
   public void checkLIR(String coreName, boolean allReplicasInLine)
@@ -601,7 +611,8 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
     long timeoutAt = System.nanoTime() + TimeUnit.NANOSECONDS.convert(timeoutms, TimeUnit.MILLISECONDS);
     final String shardsElectZkPath = electionPath + LeaderElector.ELECTION_NODE;
     
-    Slice slices = zkController.getClusterState().getSlice(collection, shardId);
+    DocCollection docCollection = zkController.getClusterState().getCollectionOrNull(collection);
+    Slice slices = (docCollection == null) ? null : docCollection.getSlice(shardId);
     int cnt = 0;
     while (!isClosed && !cc.isShutDown()) {
       // wait for everyone to be up
@@ -621,7 +632,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
         }
         
         // on startup and after connection timeout, wait for all known shards
-        if (found >= slices.getReplicasMap().size()) {
+        if (found >= slices.getReplicas(EnumSet.of(Replica.Type.TLOG, Replica.Type.NRT)).size()) {
           log.info("Enough replicas found to continue.");
           return true;
         } else {
@@ -629,7 +640,7 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
             log.info("Waiting until we see more replicas up for shard {}: total={}"
               + " found={}"
               + " timeoutin={}ms",
-                shardId, slices.getReplicasMap().size(), found,
+                shardId, slices.getReplicas(EnumSet.of(Replica.Type.TLOG, Replica.Type.NRT)).size(), found,
                 TimeUnit.MILLISECONDS.convert(timeoutAt - System.nanoTime(), TimeUnit.NANOSECONDS));
           }
         }
@@ -646,7 +657,8 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
       }
       
       Thread.sleep(500);
-      slices = zkController.getClusterState().getSlice(collection, shardId);
+      docCollection = zkController.getClusterState().getCollectionOrNull(collection);
+      slices = (docCollection == null) ? null : docCollection.getSlice(shardId);
       cnt++;
     }
     return false;
@@ -655,9 +667,10 @@ final class ShardLeaderElectionContext extends ShardLeaderElectionContextBase {
   // returns true if all replicas are found to be up, false if not
   private boolean areAllReplicasParticipating() throws InterruptedException {
     final String shardsElectZkPath = electionPath + LeaderElector.ELECTION_NODE;
-    Slice slices = zkController.getClusterState().getSlice(collection, shardId);
+    final DocCollection docCollection = zkController.getClusterState().getCollectionOrNull(collection);
     
-    if (slices != null) {
+    if (docCollection != null && docCollection.getSlice(shardId) != null) {
+      final Slice slices = docCollection.getSlice(shardId);
       int found = 0;
       try {
         found = zkClient.getChildren(shardsElectZkPath, null, true).size();

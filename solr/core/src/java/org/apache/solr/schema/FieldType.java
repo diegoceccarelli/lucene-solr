@@ -30,6 +30,7 @@ import java.util.Set;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.Tokenizer;
+import org.apache.lucene.analysis.tokenattributes.BytesTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.analysis.tokenattributes.OffsetAttribute;
 import org.apache.lucene.analysis.util.CharFilterFactory;
@@ -67,6 +68,7 @@ import org.apache.solr.common.util.StrUtils;
 import org.apache.solr.query.SolrRangeQuery;
 import org.apache.solr.response.TextResponseWriter;
 import org.apache.solr.search.QParser;
+import org.apache.solr.search.QueryUtils;
 import org.apache.solr.search.Sorting;
 import org.apache.solr.uninverting.UninvertingReader;
 import org.slf4j.Logger;
@@ -478,14 +480,20 @@ public abstract class FieldType extends FieldProperties {
       Tokenizer ts = new Tokenizer() {
         final char[] cbuf = new char[maxChars];
         final CharTermAttribute termAtt = addAttribute(CharTermAttribute.class);
+        final BytesTermAttribute bytesAtt = isPointField() ? addAttribute(BytesTermAttribute.class) : null;
         final OffsetAttribute offsetAtt = addAttribute(OffsetAttribute.class);
         @Override
         public boolean incrementToken() throws IOException {
           clearAttributes();
           int n = input.read(cbuf,0,maxChars);
           if (n<=0) return false;
-          String s = toInternal(new String(cbuf,0,n));
-          termAtt.setEmpty().append(s);
+          if (isPointField()) {
+            BytesRef b = ((PointField)FieldType.this).toInternalByteRef(new String(cbuf, 0, n));
+            bytesAtt.setBytesRef(b);
+          } else {
+            String s = toInternal(new String(cbuf, 0, n));
+            termAtt.setEmpty().append(s);
+          }
           offsetAtt.setOffset(correctOffset(0),correctOffset(n));
           return true;
         }
@@ -719,7 +727,7 @@ public abstract class FieldType extends FieldProperties {
     final BytesRef miValue = part1 == null ? null : new BytesRef(toInternal(part1));
     final BytesRef maxValue = part2 == null ? null : new BytesRef(toInternal(part2));
     if (field.hasDocValues() && !field.indexed()) {
-      return SortedSetDocValuesField.newRangeQuery(
+      return SortedSetDocValuesField.newSlowRangeQuery(
             field.getName(),
             miValue, maxValue,
             minInclusive, maxInclusive);
@@ -754,12 +762,13 @@ public abstract class FieldType extends FieldProperties {
   /** @lucene.experimental  */
   public Query getSetQuery(QParser parser, SchemaField field, Collection<String> externalVals) {
     if (!field.indexed()) {
+      // TODO: if the field isn't indexed, this feels like the wrong query type to use?
       BooleanQuery.Builder builder = new BooleanQuery.Builder();
       for (String externalVal : externalVals) {
         Query subq = getFieldQuery(parser, field, externalVal);
         builder.add(subq, BooleanClause.Occur.SHOULD);
       }
-      return builder.build();
+      return QueryUtils.build(builder, parser);
     }
 
     List<BytesRef> lst = new ArrayList<>(externalVals.size());
