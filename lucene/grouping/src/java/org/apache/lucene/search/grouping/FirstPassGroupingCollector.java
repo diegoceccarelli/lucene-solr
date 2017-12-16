@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.TreeSet;
 
 import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.FieldComparator;
 import org.apache.lucene.search.LeafFieldComparator;
 import org.apache.lucene.search.ScoreMode;
@@ -140,10 +141,22 @@ public class FirstPassGroupingCollector<T> extends SimpleCollector {
       // System.out.println("  group=" + (group.groupValue == null ? "null" : group.groupValue.toString()));
       SearchGroup<T> searchGroup = new SearchGroup<>();
       searchGroup.groupValue = group.groupValue;
+
+      // We pass this around so that we can get the corresponding solr id when serializing the search group to send to the federator
+      searchGroup.topDocLuceneId = group.topDoc;
+
       if (fillFields) {
         searchGroup.sortValues = new Object[sortFieldCount];
         for(int sortFieldIDX=0;sortFieldIDX<sortFieldCount;sortFieldIDX++) {
           searchGroup.sortValues[sortFieldIDX] = comparators[sortFieldIDX].value(group.comparatorSlot);
+        }
+        // if we are sorting by relevance (it is needed? ) then we get the first score
+        // maybe we should check that are sorting ONLY by relevance?
+        // maybe we don't need this, we should just bring back all the sort fields?
+        if (sortFieldCount > 0 && comparators[0] instanceof FieldComparator.RelevanceComparator ){
+          searchGroup.topDocScore = (Float)comparators[0].value(group.comparatorSlot);
+        } else {
+          searchGroup.topDocScore = DocIdSetIterator.NO_MORE_DOCS;
         }
       }
       result.add(searchGroup);
