@@ -1277,7 +1277,7 @@ public class QueryComponent extends SearchComponent
 
     CommandHandler commandHandler = topsGroupsActionBuilder.build();
     commandHandler.execute();
-    SearchGroupsResultTransformer serializer = new SearchGroupsResultTransformer(searcher);
+    SearchGroupsResultTransformer serializer = SearchGroupsResultTransformer.getInstance(searcher);
 
     rsp.add("firstPhase", commandHandler.processResult(result, serializer));
     rsp.add("totalHitCount", commandHandler.getTotalHitCount());
