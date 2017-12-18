@@ -16,12 +16,19 @@
  */
 package org.apache.solr.search.grouping.distributed.shardresultserializer;
 
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.DocumentStoredFieldVisitor;
+import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
 import org.apache.lucene.util.CharsRefBuilder;
+import org.apache.solr.common.SolrException;
 import org.apache.solr.common.util.NamedList;
+import org.apache.solr.schema.FieldType;
+import org.apache.solr.schema.IndexSchema;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.grouping.Command;
@@ -45,8 +52,24 @@ public abstract class SearchGroupsResultTransformer implements ShardResultTransf
     this.searcher = searcher;
   }
 
-  public static SearchGroupsResultTransformer getInstance(SolrIndexSearcher searcher){
-    return new DefaultSearchResultResultTransformer(searcher);
+  public static SearchGroupsResultTransformer getInstance(SolrIndexSearcher searcher, boolean skipSecondStep){
+    return (skipSecondStep) ? new SkipSecondStepSearchResultResultTransformer(searcher) : new DefaultSearchResultResultTransformer(searcher);
+  }
+
+  final protected Object[] getConvertedSortValues(final Object[] sortValues, final SortField[] sortFields) {
+    Object[] convertedSortValues = new Object[sortValues.length];
+    for (int i = 0; i < sortValues.length; i++) {
+      Object sortValue = sortValues[i];
+      SchemaField field = sortFields[i].getField() != null ? searcher.getSchema().getFieldOrNull(sortFields[i].getField()) : null;
+      if (field != null) {
+        FieldType fieldType = field.getType();
+        if (sortValue != null) {
+          sortValue = fieldType.marshalSortValue(sortValue);
+        }
+      }
+      convertedSortValues[i] = sortValue;
+    }
+    return convertedSortValues;
   }
 
   /**
@@ -143,6 +166,104 @@ public abstract class SearchGroupsResultTransformer implements ShardResultTransf
       }
 
       return result;
+    }
+  }
+
+  private static class SkipSecondStepSearchResultResultTransformer extends SearchGroupsResultTransformer {
+
+    private static final String TOP_DOC_SOLR_ID_KEY = "topDocSolrId";
+    private static final String TOP_DOC_SCORE_KEY = "topDocScore";
+    private static final String SORTVALUES_KEY  = "sortValues";
+
+    private SkipSecondStepSearchResultResultTransformer(SolrIndexSearcher searcher) {
+      super(searcher);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Map<String, SearchGroupsFieldCommandResult> transformToNative(NamedList<NamedList> shardResponse, Sort groupSort, Sort withinGroupSort, String shard) {
+      final Map<String, SearchGroupsFieldCommandResult> result = new HashMap<>(shardResponse.size());
+      for (Map.Entry<String, NamedList> command : shardResponse) {
+        List<SearchGroup<BytesRef>> searchGroups = new ArrayList<>();
+        NamedList topGroupsAndGroupCount = command.getValue();
+        @SuppressWarnings("unchecked")
+        final NamedList<List<Comparable>> rawSearchGroups = (NamedList<List<Comparable>>) topGroupsAndGroupCount.get(TOP_GROUPS);
+        if (rawSearchGroups != null) {
+          for (Map.Entry<String, List<Comparable>> rawSearchGroup : rawSearchGroups){
+            SearchGroup<BytesRef> searchGroup = new SearchGroup<>();
+            SchemaField groupField = rawSearchGroup.getKey() != null? searcher.getSchema().getFieldOrNull(command.getKey()) :    null;
+            searchGroup.groupValue = null;
+            if (rawSearchGroup.getKey() != null) {
+              if (groupField != null) {
+                BytesRefBuilder builder = new BytesRefBuilder();
+                groupField.getType().readableToIndexed(rawSearchGroup.getKey(), builder);
+                searchGroup.groupValue = builder.get();
+              } else {
+                searchGroup.groupValue = new BytesRef(rawSearchGroup.getKey());
+              }
+            }
+            // If we don't recognize this serialization throw an exception
+            // if (!isSerializationCompatible(rawSearchGroups)) {
+            //   logger.warn("Incompatible serialization/deserialization. Falling back to the default method");
+            //   throw new UnsupportedOperationException("Incompatible serialization/deserialization. Falling back to the default method");
+            // }
+            NamedList<Object> groupInfo = (NamedList) rawSearchGroup.getValue();
+            searchGroup.topDocLuceneId = DocIdSetIterator.NO_MORE_DOCS;
+            searchGroup.topDocScore = (float) groupInfo.get(TOP_DOC_SCORE_KEY);
+            searchGroup.topDocSolrId = groupInfo.get(TOP_DOC_SOLR_ID_KEY);
+            searchGroup.sortValues = rawSearchGroup.getValue().toArray(new Comparable[rawSearchGroup.getValue().size()]);
+            for (int i = 0; i < searchGroup.sortValues.length; i++) {
+              SchemaField field = groupSort.getSort()[i].getField() != null ? searcher.getSchema().getFieldOrNull(groupSort.     getSort()[i].getField()) : null;
+              searchGroup.sortValues[i] = ShardResultTransformerUtils.unmarshalSortValue(searchGroup.sortValues[i], field);
+            }
+            searchGroups.add(searchGroup);
+          }
+        }
+
+        final Integer groupCount = (Integer) topGroupsAndGroupCount.get(GROUP_COUNT);
+        result.put(command.getKey(), new SearchGroupsFieldCommandResult(groupCount, searchGroups));
+      }
+      return result;
+    }
+
+    @Override
+    protected NamedList serializeSearchGroup(Collection<SearchGroup<BytesRef>> data, SearchGroupsFieldCommand command) {
+      final NamedList<NamedList> result = new NamedList<>(data.size());
+      for (SearchGroup<BytesRef> searchGroup : data) {
+        Object[] convertedSortValues = getConvertedSortValues(searchGroup.sortValues, command.getGroupSort().getSort());
+        final String groupValue = searchGroup.groupValue != null ? searchGroup.groupValue.utf8ToString() : null;
+
+        final IndexSchema schema = searcher.getSchema();
+        SchemaField uniqueField = schema.getUniqueKeyField();
+
+        Document luceneDoc = null;
+        /** Use the lucene id to get the unique solr id so that it can be sent to the federator.
+         * The lucene id of a document is not unique across all shards i.e. different documents
+         * in different shards could have the same lucene id, whereas the solr id is guaranteed
+         * to be unique so this is what we need to return to the federator
+        **/
+        try {
+          luceneDoc = retrieveDocument(uniqueField, searchGroup.topDocLuceneId);
+        } catch (IOException e) {
+          throw new SolrException(SolrException.ErrorCode.SERVER_ERROR, "Cannot retrieve document for unique field " + uniqueField + " ("+e.toString()+")");
+        }
+        Object topDocSolrId = uniqueField.getType().toExternal(luceneDoc.getField(uniqueField.getName()));
+        NamedList<Object> groupInfo = new NamedList<>(5);
+        groupInfo.add(TOP_DOC_SCORE_KEY, searchGroup.topDocScore);
+        groupInfo.add(TOP_DOC_SOLR_ID_KEY, topDocSolrId);
+        groupInfo.add(SORTVALUES_KEY, convertedSortValues);
+
+        result.add(groupValue, groupInfo);
+      }
+      return result;
+    }
+
+    private Document retrieveDocument(final SchemaField uniqueField, int doc) throws IOException {
+      DocumentStoredFieldVisitor visitor = new DocumentStoredFieldVisitor(uniqueField.getName());
+      searcher.doc(doc, visitor);
+      return visitor.getDocument();
     }
   }
 }
