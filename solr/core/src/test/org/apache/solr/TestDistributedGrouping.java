@@ -271,6 +271,7 @@ public class TestDistributedGrouping extends BaseDistributedSearchTestCase {
     // We validate distributed grouping with scoring as first sort.
     // note: this 'q' matches all docs and returns the 'id' as the score, which is unique and so our results should be deterministic.
     handle.put("maxScore", SKIP);// TODO see SOLR-6612
+
     query("q", "{!func}id_i1", "rows", 100, "fl", "score,id," + i1, "group", "true", "group.field", i1, "group.limit", -1, "sort", i1 + " desc", "group.sort", "score desc"); // SOLR-2955
     query("q", "{!func}id_i1", "rows", 100, "fl", "score,id," + i1, "group", "true", "group.field", i1, "group.limit", -1, "sort", "score desc, _docid_ asc, id asc");
     query("q", "{!func}id_i1", "rows", 100, "fl", "score,id," + i1, "group", "true", "group.field", i1, "group.limit", -1);
@@ -310,6 +311,25 @@ public class TestDistributedGrouping extends BaseDistributedSearchTestCase {
     
     //Debug
     simpleQuery("q", "*:*", "rows", 10, "fl", "id," + i1, "group", "true", "group.field", i1, "debug", "true");
+
+    handle.put("numFound", 0);
+    query("q", "{!func}id_i1", "rows", 3, "group.skip.second.step", true, "group.limit", 1,  "fl",  "id," + i1, "group", "true",
+               "group.field", i1);
+//   query("q", "kings", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1);
+//   query("q", "{!func}id_i1", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1);
+//   query("q", "1234doesnotmatchanything1234", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1);
+//   assertSimpleQueryThrows("q", "{!func}id_i1", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1, "group.ngroups", true);assertSimpleQueryThrows("q", "{!func}id", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1, "group.limit", 5);
+//   assertSimpleQueryThrows("q", "{!func}id_i1", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1, "group.limit", 0);
+  }
+
+  private void assertSimpleQueryThrows(Object... queryParams) {
+    boolean requestFailed = false;
+    try {
+      simpleQuery(queryParams);
+    } catch (Exception e) {
+      requestFailed = true;
+    }
+    assertTrue(requestFailed);
   }
 
   private void simpleQuery(Object... queryParams) throws SolrServerException, IOException {

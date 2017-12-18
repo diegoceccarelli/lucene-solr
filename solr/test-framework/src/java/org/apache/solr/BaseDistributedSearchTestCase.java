@@ -785,9 +785,10 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
         }
       }
     }
-
-    cmp = compare(a.getNumFound(), b.getNumFound(), 0, handle);
-    if (cmp != null) return ".numFound" + cmp;
+    if (flags(handle, "numFound")!= 0) {
+      cmp = compare(a.getNumFound(), b.getNumFound(), 0, handle);
+      if (cmp != null) return ".numFound" + cmp;
+    }
 
     cmp = compare(a.getStart(), b.getStart(), 0, handle);
     if (cmp != null) return ".start" + cmp;
@@ -910,6 +911,8 @@ public abstract class BaseDistributedSearchTestCase extends SolrTestCaseJ4 {
     String cmp = compare(a.getResponse(), b.getResponse(), flags, handle);
     if (cmp != null) {
       log.error("Mismatched responses:\n" + a + "\n" + b);
+      System.out.println("- a = "+a);
+      System.out.println("- b = "+b);
       Assert.fail(cmp);
     }
   }
