@@ -179,13 +179,13 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
 
     for (SearchGroup<BytesRef> group : mergedTopGroups) {
       maxScore = Math.max(maxScore, group.topDocScore);
-
       rb.searchGroupToShards.get(groupField).put(group, tempSearchGroupToShards.get(groupField).get(group));
 
       ShardDoc sdoc = new ShardDoc(group.topDocScore,
           fields,
           group.topDocSolrId,
           docIdToShard.get(group.topDocSolrId) );
+      sdoc.positionInResponse = index;
 
       resultsId.put(sdoc.id, sdoc);
       groups[index++] = new GroupDocs<BytesRef>(group.topDocScore,
