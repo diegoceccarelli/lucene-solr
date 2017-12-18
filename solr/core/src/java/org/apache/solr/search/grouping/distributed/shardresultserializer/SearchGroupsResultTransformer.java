@@ -198,6 +198,7 @@ public abstract class SearchGroupsResultTransformer implements ShardResultTransf
             if (rawSearchGroup.getKey() != null) {
               if (groupField != null) {
                 BytesRefBuilder builder = new BytesRefBuilder();
+                System.out.println("diegolo groupField "+groupField.getType());
                 groupField.getType().readableToIndexed(rawSearchGroup.getKey(), builder);
                 searchGroup.groupValue = builder.get();
               } else {
@@ -213,11 +214,16 @@ public abstract class SearchGroupsResultTransformer implements ShardResultTransf
             searchGroup.topDocLuceneId = DocIdSetIterator.NO_MORE_DOCS;
             searchGroup.topDocScore = (float) groupInfo.get(TOP_DOC_SCORE_KEY);
             searchGroup.topDocSolrId = groupInfo.get(TOP_DOC_SOLR_ID_KEY);
-            searchGroup.sortValues = rawSearchGroup.getValue().toArray(new Comparable[rawSearchGroup.getValue().size()]);
+            final ArrayList<?> sortValues = (ArrayList<?>)groupInfo.get(SORTVALUES_KEY);
+            searchGroup.sortValues = sortValues.toArray(new Comparable[sortValues.size()]);
+
+            final IndexSchema schema = searcher.getSchema();
             for (int i = 0; i < searchGroup.sortValues.length; i++) {
-              SchemaField field = groupSort.getSort()[i].getField() != null ? searcher.getSchema().getFieldOrNull(groupSort.     getSort()[i].getField()) : null;
+              final String sortField = groupSort.getSort()[i].getField();
+              final SchemaField field = (sortField != null) ? schema.getFieldOrNull(sortField) : null;
               searchGroup.sortValues[i] = ShardResultTransformerUtils.unmarshalSortValue(searchGroup.sortValues[i], field);
             }
+            System.out.println("add searchGroup " +searchGroup);
             searchGroups.add(searchGroup);
           }
         }
@@ -232,8 +238,6 @@ public abstract class SearchGroupsResultTransformer implements ShardResultTransf
     protected NamedList serializeSearchGroup(Collection<SearchGroup<BytesRef>> data, SearchGroupsFieldCommand command) {
       final NamedList<NamedList> result = new NamedList<>(data.size());
       for (SearchGroup<BytesRef> searchGroup : data) {
-        Object[] convertedSortValues = getConvertedSortValues(searchGroup.sortValues, command.getGroupSort().getSort());
-        final String groupValue = searchGroup.groupValue != null ? searchGroup.groupValue.utf8ToString() : null;
 
         final IndexSchema schema = searcher.getSchema();
         SchemaField uniqueField = schema.getUniqueKeyField();
@@ -253,8 +257,12 @@ public abstract class SearchGroupsResultTransformer implements ShardResultTransf
         NamedList<Object> groupInfo = new NamedList<>(5);
         groupInfo.add(TOP_DOC_SCORE_KEY, searchGroup.topDocScore);
         groupInfo.add(TOP_DOC_SOLR_ID_KEY, topDocSolrId);
+
+        Object[] convertedSortValues = getConvertedSortValues(searchGroup.sortValues, command.getGroupSort().getSort());
         groupInfo.add(SORTVALUES_KEY, convertedSortValues);
 
+        SchemaField field = searcher.getSchema().getFieldOrNull(command.getKey());
+        final String groupValue = searchGroup.groupValue != null ? field.getType().indexedToReadable(searchGroup.groupValue, new CharsRefBuilder()).toString() : null;
         result.add(groupValue, groupInfo);
       }
       return result;
