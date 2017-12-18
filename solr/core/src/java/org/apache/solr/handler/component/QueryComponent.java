@@ -233,6 +233,31 @@ public class QueryComponent extends SearchComponent
     }
   }
 
+  private boolean allowSkipSecondGroupingStep(final GroupingSpecification groupingSpec, final boolean isReranking ) {
+    // The optimization cannot be applied if we need to know the exact number of docs
+    if (groupingSpec.isIncludeGroupCount() ) return false;
+
+    // Only possible if we only want one doc per group
+    if (groupingSpec.getGroupLimit() != 1) return false;
+
+    // Within group sort must be the same as group sort because if we skip second step no sorting within group will be done.
+    if (groupingSpec.getSortWithinGroup() !=  groupingSpec.getGroupSort()) return false;
+
+    boolean byRelevanceOnly = false;
+    SortField[] sortFields = groupingSpec.getGroupSort().getSort();
+
+    if(sortFields != null && sortFields.length == 1 && sortFields[0] != null && sortFields[0].getType() == SortField.Type.SCORE) {
+      byRelevanceOnly = true;
+    }
+
+    if(!byRelevanceOnly) return false;
+
+    // TODO: This must be removed when we release the second part of the LV patch
+    if(isReranking) return false;
+
+    return true;
+  }
+
   protected void prepareGrouping(ResponseBuilder rb) throws IOException {
 
     SolrQueryRequest req = rb.req;
@@ -289,6 +314,13 @@ public class QueryComponent extends SearchComponent
     groupingSpec.setMain(params.getBool(GroupParams.GROUP_MAIN, false));
     groupingSpec.setNeedScore((rb.getFieldFlags() & SolrIndexSearcher.GET_SCORES) != 0);
     groupingSpec.setTruncateGroups(params.getBool(GroupParams.GROUP_TRUNCATE, false));
+
+    groupingSpec.setSkipSecondGroupingStep(params.getBool(GroupParams.GROUP_SKIP_DISTRIBUTED_SECOND, false));
+    boolean isReranking = (rb.getRankQuery() != null);
+    if (groupingSpec.isSkipSecondGroupingStep() & !allowSkipSecondGroupingStep(groupingSpec, isReranking)){
+      throw new SolrException(SolrException.ErrorCode.BAD_REQUEST,
+          "Illegal grouping specification for skip second step optimization: " + groupingSpec.toString());
+    }
   }
 
 
@@ -526,6 +558,12 @@ public class QueryComponent extends SearchComponent
     } else if (rb.stage == ResponseBuilder.STAGE_GET_FIELDS) {
       shardRequestFactory = new StoredFieldsShardRequestFactory();
       nextStage = ResponseBuilder.STAGE_DONE;
+    }
+
+    if (rb.stage == ResponseBuilder.STAGE_EXECUTE_QUERY && rb.getGroupingSpec().isSkipSecondGroupingStep()) {
+      shardRequestFactory = new StoredFieldsShardRequestFactory();
+      nextStage = ResponseBuilder.STAGE_DONE;
+      rb.stage = ResponseBuilder.STAGE_GET_FIELDS;
     }
 
     if (shardRequestFactory != null) {
