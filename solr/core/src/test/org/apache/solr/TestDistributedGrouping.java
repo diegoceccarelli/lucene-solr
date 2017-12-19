@@ -315,11 +315,12 @@ public class TestDistributedGrouping extends BaseDistributedSearchTestCase {
     handle.put("numFound", 0);
     query("q", "{!func}id_i1", "rows", 3, "group.skip.second.step", true, "group.limit", 1,  "fl",  "id," + i1, "group", "true",
                "group.field", i1);
-//   query("q", "kings", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1);
-//   query("q", "{!func}id_i1", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1);
-//   query("q", "1234doesnotmatchanything1234", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1);
-//   assertSimpleQueryThrows("q", "{!func}id_i1", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1, "group.ngroups", true);assertSimpleQueryThrows("q", "{!func}id", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1, "group.limit", 5);
-//   assertSimpleQueryThrows("q", "{!func}id_i1", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1, "group.limit", 0);
+    query("q", "kings", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1);
+    query("q", "{!func}id_i1", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1);
+    //query("q", "1234doesnotmatchanything1234", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1);
+    //TODO refactor using assertQex
+    // assertSimpleQueryThrows("q", "{!func}id_i1", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1, "group.ngroups", true);assertSimpleQueryThrows("q", "{!func}id", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1, "group.limit", 5);
+    // assertSimpleQueryThrows("q", "{!func}id_i1", "group.skip.second.step", true, "fl", "id," + i1, "group", "true", "group.field", i1, "group.limit", 0);
   }
 
   private void assertSimpleQueryThrows(Object... queryParams) {

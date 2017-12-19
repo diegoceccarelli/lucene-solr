@@ -150,14 +150,14 @@ public class FirstPassGroupingCollector<T> extends SimpleCollector {
         for(int sortFieldIDX=0;sortFieldIDX<sortFieldCount;sortFieldIDX++) {
           searchGroup.sortValues[sortFieldIDX] = comparators[sortFieldIDX].value(group.comparatorSlot);
         }
-        // if we are sorting by relevance (it is needed? ) then we get the first score
-        // maybe we should check that are sorting ONLY by relevance?
-        // maybe we don't need this, we should just bring back all the sort fields?
-        if (sortFieldCount > 0 && comparators[0] instanceof FieldComparator.RelevanceComparator ){
-          searchGroup.topDocScore = (Float)comparators[0].value(group.comparatorSlot);
-        } else {
-          searchGroup.topDocScore = DocIdSetIterator.NO_MORE_DOCS;
-        }
+      }
+      // if we are sorting by relevance (it is needed? ) then we get the first score
+      // maybe we should check that are sorting ONLY by relevance?
+      // maybe we don't need this, we should just bring back all the sort fields?
+      if (sortFieldCount > 0 && comparators[0] instanceof FieldComparator.RelevanceComparator ){
+        searchGroup.topDocScore = (Float)comparators[0].value(group.comparatorSlot);
+      } else {
+        searchGroup.topDocScore = -1;
       }
       result.add(searchGroup);
     }

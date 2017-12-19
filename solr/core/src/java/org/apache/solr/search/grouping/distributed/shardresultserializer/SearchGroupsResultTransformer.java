@@ -198,13 +198,14 @@ public abstract class SearchGroupsResultTransformer implements ShardResultTransf
             if (rawSearchGroup.getKey() != null) {
               if (groupField != null) {
                 BytesRefBuilder builder = new BytesRefBuilder();
-                System.out.println("diegolo groupField "+groupField.getType());
                 groupField.getType().readableToIndexed(rawSearchGroup.getKey(), builder);
                 searchGroup.groupValue = builder.get();
               } else {
                 searchGroup.groupValue = new BytesRef(rawSearchGroup.getKey());
               }
             }
+            // I don't think we need this for upstream
+            //
             // If we don't recognize this serialization throw an exception
             // if (!isSerializationCompatible(rawSearchGroups)) {
             //   logger.warn("Incompatible serialization/deserialization. Falling back to the default method");
@@ -223,7 +224,6 @@ public abstract class SearchGroupsResultTransformer implements ShardResultTransf
               final SchemaField field = (sortField != null) ? schema.getFieldOrNull(sortField) : null;
               searchGroup.sortValues[i] = ShardResultTransformerUtils.unmarshalSortValue(searchGroup.sortValues[i], field);
             }
-            System.out.println("add searchGroup " +searchGroup);
             searchGroups.add(searchGroup);
           }
         }
