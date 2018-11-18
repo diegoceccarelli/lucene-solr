@@ -31,21 +31,26 @@ public class BookendFilter extends TokenFilter {
   private boolean lastTokenProduced = false;
 
 
-  public static final String DEFAULT_START_TOKEN = "<start>";
-  public static final String DEFAULT_END_TOKEN = "<end>";
+  public static final String DEFAULT_START_TOKEN = "\1\1\1";
+  public static final String DEFAULT_END_TOKEN = "\2\2\2";
 
   private final String startToken;
   private final String endToken;
 
-  /**
-   * Create a new BookendFilter, that add special markers at the beginning and at the end of the stream
-   *
-   * @param in TokenStream to filter
-   */
-  public BookendFilter(TokenStream in) {
+
+  public BookendFilter(TokenStream in, final String startToken, final String endToken) {
     super(in);
-    startToken = DEFAULT_START_TOKEN;
-    endToken = DEFAULT_END_TOKEN;
+    this.startToken = startToken;
+    this.endToken = endToken;
+  }
+
+    /**
+     * Create a new BookendFilter, that add special markers at the beginning and at the end of the stream
+     *
+     * @param in TokenStream to filter
+     */
+  public BookendFilter(TokenStream in) {
+    this(in, DEFAULT_START_TOKEN, DEFAULT_END_TOKEN);
   }
 
   @Override
@@ -56,16 +61,16 @@ public class BookendFilter extends TokenFilter {
       firstTokenProduced = true;
       return true;
     }
+    if (lastTokenProduced){
+      return false;
+    }
     if (input.incrementToken()) {
       // termAtt is good ?
       return true;
-    } else if (!lastTokenProduced) {
-      termAtt.setEmpty();
-      termAtt.append(endToken);
-      lastTokenProduced = true;
-      return true;
-    } else {
-      return false;
     }
+    termAtt.setEmpty();
+    termAtt.append(endToken);
+    lastTokenProduced = true;
+    return true;
   }
 }
