@@ -18,11 +18,28 @@ package org.apache.lucene.analysis;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.ArrayList;
 
+import com.sun.tools.internal.xjc.generator.util.WhitespaceNormalizer;
+import org.apache.lucene.analysis.standard.StandardTokenizer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
-import org.apache.lucene.analysis.tokenattributes.PositionIncrementAttribute;
-import org.apache.lucene.util.English;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.NoMergePolicy;
+import org.apache.lucene.index.RandomIndexWriter;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.index.TestIndexWriterExceptions;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TopFieldDocs;
+import org.apache.lucene.search.TopScoreDocCollector;
+import org.apache.lucene.store.Directory;
 
 public class TestBookendFilter extends BaseTokenStreamTestCase {
 
@@ -102,5 +119,45 @@ public class TestBookendFilter extends BaseTokenStreamTestCase {
     assertNextTokenEquals(stream, termAtt, BookendFilter.DEFAULT_END_TOKEN);
   }
 
+  public void testQueryWithBookFilter() throws IOException {
+    Directory dir = newDirectory();
+
+    Analyzer analyzer = new Analyzer(Analyzer.GLOBAL_REUSE_STRATEGY) {
+      @Override
+      public TokenStreamComponents createComponents(String fieldName) {
+        Tokenizer tokenizer = new StandardTokenizer();
+        TokenStream stream = tokenizer;
+        stream = new BookendFilter(stream);
+        return new TokenStreamComponents(tokenizer, stream);
+      }
+    };
+    IndexWriterConfig conf = newIndexWriterConfig(analyzer).setMergePolicy(NoMergePolicy.INSTANCE);
+    RandomIndexWriter w = new RandomIndexWriter(random(), dir, conf);
+
+    // segment that contains the term
+    Document doc = new Document();
+    doc.add(new TextField("title", "jonathan livingston seagull", Field.Store.NO));
+    w.addDocument(doc);
+    // segment that does not contain the term
+    doc = new Document();
+    doc.add(new TextField("title", "jonathan seagull", Field.Store.NO));
+    w.addDocument(doc);
+    // segment that does not contain the field
+    w.addDocument(new Document());
+    w.commit();
+
+    DirectoryReader reader = w.getReader();
+    IndexSearcher searcher = newSearcher(reader);
+
+    BooleanQuery.Builder query = new BooleanQuery.Builder();
+    query.add(new BooleanClause(new TermQuery(new Term("title", "jonathan")), BooleanClause.Occur.MUST));
+    query.add(new BooleanClause(new TermQuery(new Term("title", "seagull")), BooleanClause.Occur.MUST));
+
+    TopFieldDocs topDocs = searcher.search(query.build(), 3, Sort.RELEVANCE);
+    System.out.println(topDocs.totalHits);
+    reader.close();
+    w.close();
+    dir.close();
+  }
 
 }
