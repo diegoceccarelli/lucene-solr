@@ -1,0 +1,19 @@
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+}
+
+dependencies {
+    compile project(':lucene:core')
+    compile project(':lucene:queries')
+    compile project(':lucene:sandbox')
+    testCompile project(':lucene:test-framework')
+}

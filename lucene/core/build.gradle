@@ -1,0 +1,19 @@
+apply plugin: 'java'
+
+archivesBaseName = 'core'
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+}
+
+dependencies {
+    testCompile project(':lucene:codecs')
+    testCompile project(':lucene:test-framework')
+}

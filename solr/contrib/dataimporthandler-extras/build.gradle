@@ -1,0 +1,25 @@
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+}
+
+dependencies {
+	compile project(':solr:core')
+	compile project(':solr:contrib:dataimporthandler')
+	compile library.activation
+	compile library.javax_mail
+	compile library.gimap
+	compile library.tika_core
+	compile library.tika_parsers
+
+	testCompile project(':solr:test-framework')
+	testCompile project(path: ':solr:contrib:dataimporthandler', configuration: 'testOutput')
+}

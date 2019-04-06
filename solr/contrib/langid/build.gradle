@@ -1,0 +1,22 @@
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+}
+
+dependencies {
+    compile project(':solr:core')
+    compile library.langdetect
+    compile library.jsonic
+    compile library.opennlp_tools
+    compile library.tika_core
+    
+    testCompile project(':solr:test-framework')
+}

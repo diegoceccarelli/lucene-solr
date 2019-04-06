@@ -1,0 +1,19 @@
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+}
+
+dependencies {
+	compile project(':lucene:core')
+	compile project(':lucene:analysis:common')
+
+    compile library.morfologik_polish
+}

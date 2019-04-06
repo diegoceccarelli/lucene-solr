@@ -1,0 +1,22 @@
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+}
+
+dependencies {
+    compile project(':solr:core')
+    
+    testCompile project(':solr:test-framework')
+    testCompile library.jcl_over_slf4j
+    testCompile library.mockito_core
+    testCompile library.byte_buddy
+    testCompile library.objenesis
+}

@@ -1,0 +1,23 @@
+apply plugin: 'java' 
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+}
+
+dependencies {
+     compile project(':lucene:core')
+     compile project(':lucene:spatial')
+     compile project(':lucene:spatial3d')
+     compile project(':lucene:queries')
+     compile project(':lucene:sandbox')
+     compile library.s2_geometry_library_java
+     compile library.spatial4j
+     testCompile project(':lucene:test-framework')
+}

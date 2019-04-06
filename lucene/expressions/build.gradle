@@ -1,0 +1,21 @@
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+}
+
+dependencies {
+	compile project(':lucene:core')
+	compile library.antlr4_runtime
+	compile library.asm
+	compile library.asm_commons
+
+	testCompile project(':lucene:test-framework')
+}    

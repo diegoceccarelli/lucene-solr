@@ -1,0 +1,23 @@
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+}
+
+dependencies {
+    compile library.commons_lang3
+    compile library.velocity_engine_core
+    compile library.velocity_tools_generic
+    compile library.velocity_tools_view
+    compile library.velocity_tools_view_jsp
+    compile project(':solr:core')
+    
+    testCompile project(':solr:test-framework')
+}

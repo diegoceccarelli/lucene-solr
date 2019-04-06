@@ -1,0 +1,27 @@
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+
+dependencies {
+	compile project(':lucene:core')
+	compile project(':lucene:analysis:common')
+	compile project(':lucene:facet')
+	compile project(':lucene:highlighter')
+	compile project(':lucene:queryparser')
+	compile project(':lucene:spatial')
+	compile project(':lucene:spatial-extras')
+
+    compile library.commons_compress
+    compile library.icu4j
+    compile library.nekohtml
+}
+ 
+}

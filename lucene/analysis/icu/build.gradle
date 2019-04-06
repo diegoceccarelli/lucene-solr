@@ -1,0 +1,20 @@
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/java']
+        }
+        resources {
+            srcDirs = ['src/resources']
+        }
+    }
+}
+
+dependencies {
+    compile project(':lucene:core')
+    compile project(':lucene:analysis:common')
+    compile library.icu4j
+    testCompile project(':lucene:codecs')
+    testCompile project(':lucene:test-framework')
+}
