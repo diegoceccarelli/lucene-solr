@@ -26,6 +26,7 @@ import org.apache.solr.common.util.NamedList;
 import org.apache.solr.schema.SchemaField;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.grouping.Command;
+import org.apache.solr.search.grouping.SolrSearchGroup;
 import org.apache.solr.search.grouping.distributed.command.SearchGroupsFieldCommand;
 import org.apache.solr.search.grouping.distributed.command.SearchGroupsFieldCommandResult;
 
@@ -54,7 +55,7 @@ public class SearchGroupsResultTransformer implements ShardResultTransformer<Lis
       if (SearchGroupsFieldCommand.class.isInstance(command)) {
         SearchGroupsFieldCommand fieldCommand = (SearchGroupsFieldCommand) command;
         final SearchGroupsFieldCommandResult fieldCommandResult = fieldCommand.result();
-        final Collection<SearchGroup<BytesRef>> searchGroups = fieldCommandResult.getSearchGroups();
+        final Collection<SolrSearchGroup<BytesRef>> searchGroups = fieldCommandResult.getSearchGroups();
         if (searchGroups != null) {
           commandResult.add(TOP_GROUPS, serializeSearchGroup(searchGroups, fieldCommand));
         }
@@ -101,7 +102,7 @@ public class SearchGroupsResultTransformer implements ShardResultTransformer<Lis
   public Map<String, SearchGroupsFieldCommandResult> transformToNative(NamedList<NamedList> shardResponse, Sort groupSort, Sort withinGroupSort, String shard) {
     final Map<String, SearchGroupsFieldCommandResult> result = new HashMap<>(shardResponse.size());
     for (Map.Entry<String, NamedList> command : shardResponse) {
-      List<SearchGroup<BytesRef>> searchGroups = new ArrayList<>();
+      List<SolrSearchGroup<BytesRef>> searchGroups = new ArrayList<>();
       NamedList topGroupsAndGroupCount = command.getValue();
       @SuppressWarnings("unchecked")
       final NamedList<List<Comparable>> rawSearchGroups = (NamedList<List<Comparable>>) topGroupsAndGroupCount.get(TOP_GROUPS);
@@ -112,7 +113,7 @@ public class SearchGroupsResultTransformer implements ShardResultTransformer<Lis
           SearchGroup<BytesRef> searchGroup = deserializeOneSearchGroup(
               groupField, rawSearchGroup.getKey(),
               groupSortField, rawSearchGroup.getValue());
-          searchGroups.add(searchGroup);
+          searchGroups.add(new SolrSearchGroup<>(searchGroup));
         }
       }
 
@@ -122,25 +123,15 @@ public class SearchGroupsResultTransformer implements ShardResultTransformer<Lis
     return result;
   }
 
-  protected Object serializeOneSearchGroup(SortField[] groupSortField, SearchGroup<BytesRef> searchGroup) {
-    Object[] convertedSortValues = new Object[searchGroup.sortValues.length];
-    for (int i = 0; i < searchGroup.sortValues.length; i++) {
-      Object sortValue = searchGroup.sortValues[i];
-      SchemaField field = groupSortField[i].getField() != null ?
-          searcher.getSchema().getFieldOrNull(groupSortField[i].getField()) : null;
-      convertedSortValues[i] = ShardResultTransformerUtils.marshalSortValue(sortValue, field);
-    }
-    return convertedSortValues;
-  }
 
-  protected NamedList serializeSearchGroup(Collection<SearchGroup<BytesRef>> data, SearchGroupsFieldCommand command) {
+  protected NamedList serializeSearchGroup(Collection<SolrSearchGroup<BytesRef>> data, SearchGroupsFieldCommand command) {
     final NamedList<Object> result = new NamedList<>(data.size());
 
     SortField[] groupSortField = command.getGroupSort().getSort();
-    for (SearchGroup<BytesRef> searchGroup : data) {
-      Object convertedSortValues = serializeOneSearchGroup(groupSortField, searchGroup);
+    for (SolrSearchGroup<BytesRef> searchGroup : data) {
+      Object convertedSortValues = searchGroup.serialize(groupSortField, searcher.getSchema());
       SchemaField field = searcher.getSchema().getFieldOrNull(command.getKey());
-      String groupValue = searchGroup.groupValue != null ? field.getType().indexedToReadable(searchGroup.groupValue, new CharsRefBuilder()).toString() : null;
+      String groupValue = searchGroup.getGroupValue(field);
       result.add(groupValue, convertedSortValues);
     }
 

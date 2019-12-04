@@ -43,6 +43,7 @@ import org.apache.solr.search.QueryResult;
 import org.apache.solr.search.RankQuery;
 import org.apache.solr.search.SortSpec;
 import org.apache.solr.search.grouping.GroupingSpecification;
+import org.apache.solr.search.grouping.SolrSearchGroup;
 import org.apache.solr.search.grouping.distributed.command.QueryCommandResult;
 import org.apache.solr.util.RTimer;
 
@@ -186,7 +187,7 @@ public class ResponseBuilder
   // Context fields for grouping
   public final Map<String, Collection<SearchGroup<BytesRef>>> mergedSearchGroups = new HashMap<>();
   public final Map<String, Integer> mergedGroupCounts = new HashMap<>();
-  public final Map<String, Map<SearchGroup<BytesRef>, Set<String>>> searchGroupToShards = new HashMap<>();
+  public final Map<String, Map<SolrSearchGroup<BytesRef>, Set<String>>> searchGroupToShards = new HashMap<>();
   public final Map<String, TopGroups<BytesRef>> mergedTopGroups = new HashMap<>();
   public final Map<String, QueryCommandResult> mergedQueryCommandResults = new HashMap<>();
   public final Map<Object, SolrDocument> retrievedDocuments = new HashMap<>();

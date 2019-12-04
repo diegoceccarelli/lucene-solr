@@ -20,6 +20,7 @@ import java.util.Collection;
 
 import org.apache.lucene.search.grouping.SearchGroup;
 import org.apache.lucene.util.BytesRef;
+import org.apache.solr.search.grouping.SolrSearchGroup;
 
 /**
  * Encapsulates the result of a {@link SearchGroupsFieldCommand} command
@@ -27,9 +28,9 @@ import org.apache.lucene.util.BytesRef;
 public class SearchGroupsFieldCommandResult {
 
   private final Integer groupCount;
-  private final Collection<SearchGroup<BytesRef>> searchGroups;
+  private final Collection<SolrSearchGroup<BytesRef>> searchGroups;
 
-  public SearchGroupsFieldCommandResult(Integer groupCount, Collection<SearchGroup<BytesRef>> searchGroups) {
+  public SearchGroupsFieldCommandResult(Integer groupCount, Collection<SolrSearchGroup<BytesRef>> searchGroups) {
     this.groupCount = groupCount;
     this.searchGroups = searchGroups;
   }
@@ -38,7 +39,7 @@ public class SearchGroupsFieldCommandResult {
     return groupCount;
   }
 
-  public Collection<SearchGroup<BytesRef>> getSearchGroups() {
+  public Collection<SolrSearchGroup<BytesRef>> getSearchGroups() {
     return searchGroups;
   }
 }

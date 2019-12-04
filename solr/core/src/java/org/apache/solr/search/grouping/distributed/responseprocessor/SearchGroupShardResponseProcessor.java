@@ -39,6 +39,7 @@ import org.apache.solr.handler.component.ShardResponse;
 import org.apache.solr.response.SolrQueryResponse;
 import org.apache.solr.search.SolrIndexSearcher;
 import org.apache.solr.search.SortSpec;
+import org.apache.solr.search.grouping.SolrSearchGroup;
 import org.apache.solr.search.grouping.distributed.ShardResponseProcessor;
 import org.apache.solr.search.grouping.distributed.command.SearchGroupsFieldCommandResult;
 import org.apache.solr.search.grouping.distributed.shardresultserializer.SearchGroupsResultTransformer;
@@ -65,12 +66,12 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
     assert withinGroupSort != null;
 
     final Map<String, List<Collection<SearchGroup<BytesRef>>>> commandSearchGroups = new HashMap<>(fields.length, 1.0f);
-    final Map<String, Map<SearchGroup<BytesRef>, Set<String>>> tempSearchGroupToShards = new HashMap<>(fields.length, 1.0f);
+    final Map<String, Map<SolrSearchGroup<BytesRef>, Set<String>>> tempSearchGroupToShards = new HashMap<>(fields.length, 1.0f);
     for (String field : fields) {
-      commandSearchGroups.put(field, new ArrayList<Collection<SearchGroup<BytesRef>>>(shardRequest.responses.size()));
-      tempSearchGroupToShards.put(field, new HashMap<SearchGroup<BytesRef>, Set<String>>());
+      commandSearchGroups.put(field, new ArrayList<>(shardRequest.responses.size()));
+      tempSearchGroupToShards.put(field, new HashMap<>());
       if (!rb.searchGroupToShards.containsKey(field)) {
-        rb.searchGroupToShards.put(field, new HashMap<SearchGroup<BytesRef>, Set<String>>());
+        rb.searchGroupToShards.put(field, new HashMap<>());
       }
     }
 
@@ -129,7 +130,7 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
           rb.mergedGroupCounts.put(field, existingGroupCount != null ? Integer.valueOf(existingGroupCount + groupCount) : groupCount);
         }
 
-        final Collection<SearchGroup<BytesRef>> searchGroups = firstPhaseCommandResult.getSearchGroups();
+        final Collection<SolrSearchGroup<BytesRef>> searchGroups = firstPhaseCommandResult.getSearchGroups();
         if (searchGroups == null) {
           continue;
         }
@@ -156,18 +157,18 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
 
   protected static class SearchGroupsContainer {
 
-    private final Map<String, Map<SearchGroup<BytesRef>, Set<String>>> tempSearchGroupToShards;
+    private final Map<String, Map<SolrSearchGroup<BytesRef>, Set<String>>> tempSearchGroupToShards;
 
     public SearchGroupsContainer(String[] fields) {
       tempSearchGroupToShards = new HashMap<>(fields.length, 1.0f);
       for (String field : fields) {
-        tempSearchGroupToShards.put(field, new HashMap<SearchGroup<BytesRef>, Set<String>>());
+        tempSearchGroupToShards.put(field, new HashMap<>());
       }
     }
 
-    public void addSearchGroups(ShardResponse srsp, String field, Collection<SearchGroup<BytesRef>> searchGroups) {
-      for (SearchGroup<BytesRef> searchGroup : searchGroups) {
-        Map<SearchGroup<BytesRef>, Set<String>> map = tempSearchGroupToShards.get(field);
+    public void addSearchGroups(ShardResponse srsp, String field, Collection<SolrSearchGroup<BytesRef>> searchGroups) {
+      for (SolrSearchGroup<BytesRef> searchGroup : searchGroups) {
+        Map<SolrSearchGroup<BytesRef>, Set<String>> map = tempSearchGroupToShards.get(field);
         Set<String> shards = map.get(searchGroup);
         if (shards == null) {
           shards = new HashSet<>();
@@ -182,7 +183,6 @@ public class SearchGroupShardResponseProcessor implements ShardResponseProcessor
      * This accumulates {@link ResponseBuilder#mergedSearchGroups} for use in the second step.
      */
     public void addMergedSearchGroups(ResponseBuilder rb, String groupField, Collection<SearchGroup<BytesRef>> mergedTopGroups) {
-      rb.mergedSearchGroups.put(groupField, mergedTopGroups);
       rb.mergedSearchGroups.put(groupField, mergedTopGroups);
     }
 

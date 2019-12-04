@@ -24,17 +24,17 @@ import org.apache.solr.schema.SchemaField;
  *
  * @lucene.experimental
  */
-class ShardResultTransformerUtils {
+public class ShardResultTransformerUtils {
 
-  static Object marshalSortValue(Object originalSortValue, SchemaField schemaField) {
+  public static Object marshalSortValue(Object originalSortValue, SchemaField schemaField) {
     return marshalOrUnmarshalSortValue(originalSortValue, schemaField, true);
   }
 
-  static Object unmarshalSortValue(Object originalSortValue, SchemaField schemaField) {
+  public static Object unmarshalSortValue(Object originalSortValue, SchemaField schemaField) {
     return marshalOrUnmarshalSortValue(originalSortValue, schemaField, false);
   }
 
-  private static Object marshalOrUnmarshalSortValue(Object originalSortValue, SchemaField schemaField,
+  public static Object marshalOrUnmarshalSortValue(Object originalSortValue, SchemaField schemaField,
       boolean marshal) {
     if (originalSortValue != null && schemaField != null) {
       final FieldType fieldType = schemaField.getType();
